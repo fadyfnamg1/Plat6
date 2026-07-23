@@ -1,6 +1,7 @@
 import { useStore } from '../../lib/store';
 import { playClick, resumeAudio } from '../../lib/sounds';
 import LanguageSwitcher from '../LanguageSwitcher';
+import { useI18n } from '../../lib/i18n';
 
 function IconDeposit() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 7l-5-5-5 5M17 17l-5 5-5-5"/></svg>;
@@ -28,6 +29,7 @@ function IconLogout() {
 }
 
 export default function PanelOverlay() {
+  const { t } = useI18n();
   const setOverlay  = useStore(s => s.setOverlay);
   const userInfo    = useStore(s => s.userInfo);
   const setUserInfo = useStore(s => s.setUserInfo);
@@ -51,19 +53,19 @@ export default function PanelOverlay() {
   function go(ov: string) { resumeAudio(); playClick(); setOverlay(ov as any); }
   function goWithdraw() { resumeAudio(); playClick(); setTransfersTab('withdraw'); setOverlay('transfers'); }
   function logout() {
-    showConfirm('Sign Out', 'Are you sure you want to sign out?', () => {
+    showConfirm(t('app.panel.signOut'), 'Are you sure you want to sign out?', () => {
       setUserInfo(null); setScreen('landing');
     });
   }
 
   const MENU = [
-    { icon: <IconDeposit />,    color: '#00D68F', bg: 'rgba(0,214,143,.12)',  title: 'Deposit',       sub: 'Add funds to your account',     action: () => go('deposit') },
-    { icon: <IconWithdraw />,   color: '#3B82F6', bg: 'rgba(59,130,246,.12)', title: 'Withdrawal',    sub: 'Cash out to your account',       action: goWithdraw },
-    { icon: <IconHistory />,    color: '#F59E0B', bg: 'rgba(245,158,11,.12)', title: 'Trade History', sub: 'View all your past trades',      action: () => go('history') },
-    { icon: <IconProfile />,    color: '#8B5CF6', bg: 'rgba(139,92,246,.12)', title: 'My Profile',    sub: 'Account details & settings',     action: () => go('profile') },
-    { icon: <IconSignals />,    color: '#EC4899', bg: 'rgba(236,72,153,.12)', title: 'Trade Signals', sub: 'AI-powered market signals',      action: () => go('signals') },
-    { icon: <IconEvents />,     color: '#F97316', bg: 'rgba(249,115,22,.12)', title: 'Events',        sub: 'Promotions & bonus offers',      action: () => go('events') },
-    { icon: <IconSupport />,    color: '#10B981', bg: 'rgba(16,185,129,.12)', title: 'Support',       sub: '24/7 customer service',          action: () => go('events') },
+    { icon: <IconDeposit />,    color: '#00D68F', bg: 'rgba(0,214,143,.12)',  title: t('app.panel.deposit'),    sub: t('app.panel.depositSub'),    action: () => go('deposit') },
+    { icon: <IconWithdraw />,   color: '#3B82F6', bg: 'rgba(59,130,246,.12)', title: t('app.panel.withdrawal'), sub: t('app.panel.withdrawalSub'), action: goWithdraw },
+    { icon: <IconHistory />,    color: '#F59E0B', bg: 'rgba(245,158,11,.12)', title: t('app.panel.history'),    sub: t('app.panel.historySub'),    action: () => go('history') },
+    { icon: <IconProfile />,    color: '#8B5CF6', bg: 'rgba(139,92,246,.12)', title: t('app.panel.profile'),    sub: t('app.panel.profileSub'),    action: () => go('profile') },
+    { icon: <IconSignals />,    color: '#EC4899', bg: 'rgba(236,72,153,.12)', title: t('app.panel.signals'),    sub: t('app.panel.signalsSub'),    action: () => go('signals') },
+    { icon: <IconEvents />,     color: '#F97316', bg: 'rgba(249,115,22,.12)', title: t('app.panel.events'),     sub: t('app.panel.eventsSub'),     action: () => go('events') },
+    { icon: <IconSupport />,    color: '#10B981', bg: 'rgba(16,185,129,.12)', title: t('app.panel.support'),    sub: t('app.panel.supportSub'),    action: () => go('events') },
   ];
 
   return (
@@ -73,7 +75,7 @@ export default function PanelOverlay() {
 
         {/* Header */}
         <div className="overlay-header">
-          <span className="overlay-title">Account</span>
+          <span className="overlay-title">{t('app.panel.title')}</span>
           <button className="overlay-close" onClick={() => setOverlay('none')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -104,9 +106,9 @@ export default function PanelOverlay() {
             {/* Stats row */}
             <div style={{ display: 'flex', gap: 0, marginTop: 8, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden', width: '100%' }}>
               {[
-                { val: resolved.length, lbl: 'Trades' },
-                { val: `${winRate}%`,   lbl: 'Win Rate' },
-                { val: `${totalProfit >= 0 ? '+' : ''}$${Math.abs(totalProfit).toFixed(0)}`, lbl: 'P&L', color: totalProfit >= 0 ? 'var(--g0)' : 'var(--red)' },
+                { val: resolved.length, lbl: t('app.panel.trades') },
+                { val: `${winRate}%`,   lbl: t('app.panel.winRate') },
+                { val: `${totalProfit >= 0 ? '+' : ''}$${Math.abs(totalProfit).toFixed(0)}`, lbl: t('app.panel.pnl'), color: totalProfit >= 0 ? 'var(--g0)' : 'var(--red)' },
               ].map((s, i) => (
                 <div key={i} style={{
                   flex: 1, padding: '12px 4px', textAlign: 'center',
@@ -125,20 +127,20 @@ export default function PanelOverlay() {
               background: 'linear-gradient(135deg, rgba(245,158,11,.1) 0%, rgba(245,158,11,.05) 100%)',
               border: '1px solid rgba(245,158,11,.2)', borderRadius: 'var(--r2)', padding: '14px 16px',
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: .5, marginBottom: 4, textTransform: 'uppercase' }}>Demo Balance</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: .5, marginBottom: 4, textTransform: 'uppercase' }}>{t('app.panel.demoBalance')}</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: '#F59E0B', fontFamily: 'JetBrains Mono' }}>${demoBalance.toFixed(2)}</div>
             </div>
             <div style={{
               background: 'linear-gradient(135deg, rgba(0,214,143,.1) 0%, rgba(0,214,143,.05) 100%)',
               border: '1px solid rgba(0,214,143,.2)', borderRadius: 'var(--r2)', padding: '14px 16px',
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--g0)', letterSpacing: .5, marginBottom: 4, textTransform: 'uppercase' }}>Real Balance</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--g0)', letterSpacing: .5, marginBottom: 4, textTransform: 'uppercase' }}>{t('app.panel.realBalance')}</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--g0)', fontFamily: 'JetBrains Mono' }}>${realBalance.toFixed(2)}</div>
             </div>
           </div>
 
           {/* ── Menu ── */}
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Quick Actions</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>{t('app.panel.quickActions')}</div>
           <div className="panel-menu">
             {MENU.map((item, i) => (
               <div key={i} className="panel-menu-item" onClick={item.action} style={{ animationDelay: `${i * 0.04}s` }}>
@@ -153,7 +155,7 @@ export default function PanelOverlay() {
           </div>
 
           {/* ── Preferences ── */}
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', letterSpacing: 1, textTransform: 'uppercase', margin: '18px 0 8px' }}>Preferences</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', letterSpacing: 1, textTransform: 'uppercase', margin: '18px 0 8px' }}>{t('app.panel.preferences')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -170,7 +172,7 @@ export default function PanelOverlay() {
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                   </svg>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Appearance</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{t('app.panel.appearance')}</div>
               </div>
               <div style={{ display: 'flex', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 999, padding: 3, gap: 2 }}>
                 {(['dark', 'light'] as const).map(m => (
@@ -191,7 +193,7 @@ export default function PanelOverlay() {
                       ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
                       : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="6" y2="6"/><line x1="18" y1="18" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="6" y2="18"/><line x1="18" y1="6" x2="19.8" y2="4.2"/></svg>
                     }
-                    {m === 'dark' ? 'Dark' : 'Light'}
+                    {m === 'dark' ? t('app.panel.dark') : t('app.panel.light')}
                   </button>
                 ))}
               </div>
@@ -210,7 +212,7 @@ export default function PanelOverlay() {
                     <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
                   </svg>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Language</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{t('app.panel.language')}</div>
               </div>
               <LanguageSwitcher className="panel" />
             </div>
@@ -228,7 +230,7 @@ export default function PanelOverlay() {
               fontFamily: 'inherit', transition: 'background .2s',
             }}
           >
-            <IconLogout /> Sign Out
+            <IconLogout /> {t('app.panel.signOut')}
           </button>
         </div>
       </div>

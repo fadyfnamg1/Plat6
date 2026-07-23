@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
 import { fmt } from '../../lib/markets';
+import { useI18n } from '../../lib/i18n';
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -12,6 +13,7 @@ function formatDur(from: number, to: number) {
 }
 
 export default function HistoryOverlay() {
+  const { t: tr } = useI18n();
   const setOverlay     = useStore(s => s.setOverlay);
   const trades         = useStore(s => s.trades);
   const earlyCloseTrade = useStore(s => s.earlyCloseTrade);
@@ -37,9 +39,9 @@ export default function HistoryOverlay() {
 
   function earlyClose(t: typeof trades[0]) {
     const exit = t.entry * (1 + (Math.random() - 0.5) * 0.005);
-    showConfirm('Early Close',
-      `Close now and get back 50% ($${(t.amount / 2).toFixed(2)})?`,
-      () => { earlyCloseTrade(t.id, exit); adjustBalance(t.amount / 2, t.walType); showToast(`Refunded $${(t.amount / 2).toFixed(2)}`); }
+    showConfirm(tr('hist.earlyCloseTitle'),
+      `${tr('hist.earlyCloseConfirm')} ($${(t.amount / 2).toFixed(2)})?`,
+      () => { earlyCloseTrade(t.id, exit); adjustBalance(t.amount / 2, t.walType); showToast(`${tr('hist.refunded')} $${(t.amount / 2).toFixed(2)}`); }
     );
   }
 
@@ -50,7 +52,7 @@ export default function HistoryOverlay() {
 
         {/* Header */}
         <div className="overlay-header">
-          <span className="overlay-title">Trade History</span>
+          <span className="overlay-title">{tr('app.panel.history')}</span>
           <button className="overlay-close" onClick={() => setOverlay('none')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -62,17 +64,17 @@ export default function HistoryOverlay() {
             <div style={{ display: 'flex', gap: 16 }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--g0)' }}>{wins}</div>
-                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>WINS</div>
+                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>{tr('hist.wins').toUpperCase()}</div>
               </div>
               <div style={{ width: 1, background: 'var(--border)' }} />
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--red)' }}>{losses}</div>
-                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>LOSSES</div>
+                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>{tr('hist.losses').toUpperCase()}</div>
               </div>
               <div style={{ width: 1, background: 'var(--border)' }} />
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--t2)' }}>{wr}%</div>
-                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>WIN RATE</div>
+                <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginTop: 1 }}>{tr('app.panel.winRate').toUpperCase()}</div>
               </div>
             </div>
             <div style={{ fontSize: 16, fontWeight: 800, color: totalProfit >= 0 ? 'var(--g0)' : 'var(--red)', fontFamily: 'JetBrains Mono' }}>
@@ -85,10 +87,10 @@ export default function HistoryOverlay() {
         <div style={{ padding: '0 16px 8px' }}>
           <div className="hist-tabs">
             <button className={`hist-tab ${tab === 'open' ? 'active' : ''}`} onClick={() => setTab('open')}>
-              Active {open.length > 0 && <span style={{ marginLeft: 4, background: 'var(--g0)', color: '#000', borderRadius: 10, padding: '0 6px', fontSize: 10, fontWeight: 800 }}>{open.length}</span>}
+              {tr('hist.active')} {open.length > 0 && <span style={{ marginLeft: 4, background: 'var(--g0)', color: '#000', borderRadius: 10, padding: '0 6px', fontSize: 10, fontWeight: 800 }}>{open.length}</span>}
             </button>
             <button className={`hist-tab ${tab === 'closed' ? 'active' : ''}`} onClick={() => setTab('closed')}>
-              Closed {closed.length > 0 && <span style={{ marginLeft: 4, background: 'var(--bg3)', color: 'var(--t3)', borderRadius: 10, padding: '0 6px', fontSize: 10, fontWeight: 700 }}>{closed.length}</span>}
+              {tr('hist.closed')} {closed.length > 0 && <span style={{ marginLeft: 4, background: 'var(--bg3)', color: 'var(--t3)', borderRadius: 10, padding: '0 6px', fontSize: 10, fontWeight: 700 }}>{closed.length}</span>}
             </button>
           </div>
         </div>
@@ -100,9 +102,9 @@ export default function HistoryOverlay() {
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="1.2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
               </svg>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t3)', marginTop: 8 }}>No {tab} trades</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t3)', marginTop: 8 }}>{tab === 'open' ? tr('hist.noOpenTrades') : tr('hist.noClosedTrades')}</div>
               <div style={{ fontSize: 12, color: 'var(--t4)', marginTop: 4 }}>
-                {tab === 'open' ? 'Open a trade to see it here' : 'Your closed trades will appear here'}
+                {tab === 'open' ? tr('hist.openHint') : tr('hist.closedHint')}
               </div>
             </div>
           ) : (
@@ -146,7 +148,7 @@ export default function HistoryOverlay() {
                       }}>
                         {!t.resolved
                           ? `${mins}:${secs.toString().padStart(2, '0')}`
-                          : t.earlyClosed ? 'CLOSED' : t.won ? '✓ WON' : '✗ LOST'
+                          : t.earlyClosed ? tr('hist.closedStatus') : t.won ? `✓ ${tr('hist.won')}` : `✗ ${tr('hist.lost')}`
                         }
                       </div>
                     </div>
@@ -154,10 +156,10 @@ export default function HistoryOverlay() {
                     {/* Row 2: metrics grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 10 }}>
                       {[
-                        { lbl: 'Amount',  val: `$${t.amount.toFixed(2)}` },
-                        { lbl: 'Entry',   val: fmt(t.entry, t.dec) },
-                        { lbl: t.resolved ? 'Exit' : 'Payout', val: t.resolved ? fmt(t.exit || 0, t.dec) : `${t.payout}%` },
-                        { lbl: t.resolved ? 'Duration' : 'Wallet', val: t.resolved ? formatDur(t.openedAt, t.resolvedAt || now) : t.walType.toUpperCase() },
+                        { lbl: tr('app.trade.amount'), val: `$${t.amount.toFixed(2)}` },
+                        { lbl: tr('hist.entry'),   val: fmt(t.entry, t.dec) },
+                        { lbl: t.resolved ? tr('hist.exit') : tr('app.trade.payout'), val: t.resolved ? fmt(t.exit || 0, t.dec) : `${t.payout}%` },
+                        { lbl: t.resolved ? tr('hist.duration') : tr('hist.wallet'), val: t.resolved ? formatDur(t.openedAt, t.resolvedAt || now) : t.walType.toUpperCase() },
                       ].map((f, i) => (
                         <div key={i} style={{ background: 'var(--bg1)', borderRadius: 6, padding: '6px 8px' }}>
                           <div style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600, marginBottom: 3 }}>{f.lbl}</div>
@@ -185,7 +187,7 @@ export default function HistoryOverlay() {
                             background: 'rgba(255,58,78,.1)', border: '1px solid rgba(255,58,78,.25)',
                             color: 'var(--red)', cursor: 'pointer', fontFamily: 'inherit',
                           }}
-                        >Close Early</button>
+                        >{tr('hist.closeEarly')}</button>
                       )}
                     </div>
                   </div>

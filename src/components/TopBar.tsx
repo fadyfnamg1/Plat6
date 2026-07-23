@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { playClick, resumeAudio } from '../lib/sounds';
+import { useI18n } from '../lib/i18n';
 
 export default function TopBar() {
   const walType       = useStore(s => s.walType);
@@ -15,6 +16,7 @@ export default function TopBar() {
 
   const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   const bal = walType === 'demo' ? demoBalance : realBalance;
 
@@ -65,7 +67,7 @@ export default function TopBar() {
           >
             <div className={`tb-wallet-dot ${walType}`} />
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span className="tb-wallet-label">{walType === 'demo' ? 'Demo' : 'Real'}</span>
+              <span className="tb-wallet-label">{walType === 'demo' ? t('app.wallet.demo') : t('app.wallet.real')}</span>
               <span className="tb-balance">
                 ${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>

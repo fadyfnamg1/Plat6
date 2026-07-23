@@ -2,8 +2,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { useStore } from '../lib/store';
 import { playOpen, playWin, playLoss, resumeAudio } from '../lib/sounds';
 import { fmt } from '../lib/markets';
+import { useI18n } from '../lib/i18n';
 
 export default function BottomControls() {
+  const { t } = useI18n();
   const amount        = useStore(s => s.amount);
   const setAmount     = useStore(s => s.setAmount);
   const expMin        = useStore(s => s.expMin);
@@ -149,7 +151,7 @@ export default function BottomControls() {
       <div className="amount-row">
         <div className="amount-display" onClick={() => setOverlay('expiry' as any)}>
           <div>
-            <div className="amount-label">Amount</div>
+            <div className="amount-label">{t('app.trade.amount')}</div>
             <div className="amount-val">${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
           </div>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -175,7 +177,7 @@ export default function BottomControls() {
 
         <div className="expiry-display" onClick={() => setOverlay('expiry' as any)}>
           <div>
-            <div className="expiry-label">Expiry</div>
+            <div className="expiry-label">{t('app.trade.expiry')}</div>
             <div className="expiry-val">{expDisp}</div>
           </div>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -188,15 +190,15 @@ export default function BottomControls() {
         padding:'4px 2px', marginBottom:8,
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:10, color:'var(--t4)' }}>Payout</span>
+          <span style={{ fontSize:10, color:'var(--t4)' }}>{t('app.trade.payout')}</span>
           <span style={{ fontSize:12, fontWeight:800, color:'var(--g0)' }}>{payout}%</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:10, color:'var(--t4)' }}>Profit</span>
+          <span style={{ fontSize:10, color:'var(--t4)' }}>{t('app.trade.profit')}</span>
           <span style={{ fontSize:12, fontWeight:800, color:'var(--g0)', fontFamily:'JetBrains Mono, monospace' }}>+${profit}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:10, color:'var(--t4)' }}>Balance</span>
+          <span style={{ fontSize:10, color:'var(--t4)' }}>{t('app.trade.balance')}</span>
           <span style={{ fontSize:12, fontWeight:700, color:'var(--t2)', fontFamily:'JetBrains Mono, monospace' }}>${bal.toFixed(2)}</span>
         </div>
       </div>
@@ -211,7 +213,7 @@ export default function BottomControls() {
             <polyline points="18 15 12 9 6 15"/>
           </svg>
           <div>
-            <div style={{ fontSize:14, fontWeight:900, letterSpacing:.5 }}>BUY UP</div>
+            <div style={{ fontSize:14, fontWeight:900, letterSpacing:.5 }}>{t('app.trade.buyUp')}</div>
             <div className="trade-btn-sub">+${profit}</div>
           </div>
         </button>
@@ -220,7 +222,7 @@ export default function BottomControls() {
           onClick={(e) => { addRipple(e); openTrade('sell'); }}
         >
           <div>
-            <div style={{ fontSize:14, fontWeight:900, letterSpacing:.5 }}>SELL DOWN</div>
+            <div style={{ fontSize:14, fontWeight:900, letterSpacing:.5 }}>{t('app.trade.sellDown')}</div>
             <div className="trade-btn-sub">+${profit}</div>
           </div>
           <svg className="trade-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

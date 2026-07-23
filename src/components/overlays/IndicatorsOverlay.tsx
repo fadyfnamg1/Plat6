@@ -1,147 +1,149 @@
 import { useState } from 'react';
 import { useStore } from '../../lib/store';
 import type { Indicator } from '../../types';
+import { useI18n } from '../../lib/i18n';
 
 const INDICATORS: Indicator[] = [
   {
     id: 'rsi',
     name: 'RSI',
-    desc: 'Relative Strength Index — momentum oscillator',
+    descKey: 'ind.desc.rsi',
     color: '#F59E0B',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
   {
     id: 'macd',
     name: 'MACD',
-    desc: 'Moving Average Convergence Divergence',
+    descKey: 'ind.desc.macd',
     color: '#3B82F6',
     subChart: true,
     params: [
-      { key: 'fast', label: 'Fast Period', value: 12, min: 3, max: 50, step: 1 },
-      { key: 'slow', label: 'Slow Period', value: 26, min: 6, max: 100, step: 1 },
-      { key: 'signal', label: 'Signal Period', value: 9, min: 3, max: 30, step: 1 },
+      { key: 'fast', labelKey: 'ind.fastPeriod', value: 12, min: 3, max: 50, step: 1 },
+      { key: 'slow', labelKey: 'ind.slowPeriod', value: 26, min: 6, max: 100, step: 1 },
+      { key: 'signal', labelKey: 'ind.signalPeriod', value: 9, min: 3, max: 30, step: 1 },
     ],
   },
   {
     id: 'bb',
     name: 'Bollinger Bands',
-    desc: 'Volatility bands around a moving average',
+    descKey: 'ind.desc.bb',
     color: '#007BFF',
     subChart: false,
     params: [
-      { key: 'period', label: 'Period', value: 20, min: 5, max: 100, step: 1 },
-      { key: 'mult', label: 'Std Dev', value: 2, min: 1, max: 4, step: 0.5 },
+      { key: 'period', labelKey: 'ind.period', value: 20, min: 5, max: 100, step: 1 },
+      { key: 'mult', labelKey: 'ind.stdDev', value: 2, min: 1, max: 4, step: 0.5 },
     ],
   },
   {
     id: 'ema20',
     name: 'EMA',
-    desc: 'Exponential Moving Average',
+    descKey: 'ind.desc.ema20',
     color: '#F59E0B',
     subChart: false,
-    params: [{ key: 'period', label: 'Period', value: 20, min: 3, max: 200, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 20, min: 3, max: 200, step: 1 }],
   },
   {
     id: 'sma20',
     name: 'SMA',
-    desc: 'Simple Moving Average',
+    descKey: 'ind.desc.sma20',
     color: '#8B5CF6',
     subChart: false,
-    params: [{ key: 'period', label: 'Period', value: 20, min: 3, max: 200, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 20, min: 3, max: 200, step: 1 }],
   },
   {
     id: 'cci',
     name: 'CCI',
-    desc: 'Commodity Channel Index',
+    descKey: 'ind.desc.cci',
     color: '#10B981',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
   {
     id: 'atr',
     name: 'ATR',
-    desc: 'Average True Range — volatility indicator',
+    descKey: 'ind.desc.atr',
     color: '#EC4899',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
   {
     id: 'stoch',
     name: 'Stochastic',
-    desc: 'Stochastic Oscillator',
+    descKey: 'ind.desc.stoch',
     color: '#06B6D4',
     subChart: true,
     params: [
-      { key: 'k', label: '%K Period', value: 14, min: 5, max: 50, step: 1 },
-      { key: 'd', label: '%D Period', value: 3, min: 1, max: 20, step: 1 },
+      { key: 'k', labelKey: 'ind.kPeriod', value: 14, min: 5, max: 50, step: 1 },
+      { key: 'd', labelKey: 'ind.dPeriod', value: 3, min: 1, max: 20, step: 1 },
     ],
   },
   {
     id: 'williams',
     name: 'Williams %R',
-    desc: 'Williams Percent Range oscillator',
+    descKey: 'ind.desc.williams',
     color: '#F97316',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
   {
     id: 'volume',
     name: 'Volume',
-    desc: 'Trading volume histogram',
+    descKey: 'ind.desc.volume',
     color: '#6B7280',
     subChart: true,
   },
   {
     id: 'vwap',
     name: 'VWAP',
-    desc: 'Volume-Weighted Average Price',
+    descKey: 'ind.desc.vwap',
     color: '#22D3EE',
     subChart: false,
   },
   {
     id: 'wma20',
     name: 'WMA',
-    desc: 'Weighted Moving Average',
+    descKey: 'ind.desc.wma20',
     color: '#84CC16',
     subChart: false,
-    params: [{ key: 'period', label: 'Period', value: 20, min: 3, max: 200, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 20, min: 3, max: 200, step: 1 }],
   },
   {
     id: 'donchian',
     name: 'Donchian Channels',
-    desc: 'Highest high / lowest low breakout bands',
+    descKey: 'ind.desc.donchian',
     color: '#A855F7',
     subChart: false,
-    params: [{ key: 'period', label: 'Period', value: 20, min: 5, max: 100, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 20, min: 5, max: 100, step: 1 }],
   },
   {
     id: 'adx',
     name: 'ADX',
-    desc: 'Average Directional Index — trend strength',
+    descKey: 'ind.desc.adx',
     color: '#EF4444',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
   {
     id: 'momentum',
     name: 'Momentum',
-    desc: 'Rate of price change over N bars',
+    descKey: 'ind.desc.momentum',
     color: '#FACC15',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 10, min: 2, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 10, min: 2, max: 50, step: 1 }],
   },
   {
     id: 'mfi',
     name: 'MFI',
-    desc: 'Money Flow Index — volume-weighted RSI',
+    descKey: 'ind.desc.mfi',
     color: '#FB7185',
     subChart: true,
-    params: [{ key: 'period', label: 'Period', value: 14, min: 5, max: 50, step: 1 }],
+    params: [{ key: 'period', labelKey: 'ind.period', value: 14, min: 5, max: 50, step: 1 }],
   },
 ];
 
 function ParamsEditor({ ind }: { ind: Indicator }) {
+  const { t } = useI18n();
   const indicatorSettings = useStore(s => s.indicatorSettings);
   const setIndicatorParam = useStore(s => s.setIndicatorParam);
   const settings = indicatorSettings[ind.id] || {};
@@ -154,7 +156,7 @@ function ParamsEditor({ ind }: { ind: Indicator }) {
         const cur = settings[param.key] ?? param.value;
         return (
           <div key={param.key} className="ind-param-row">
-            <span className="ind-param-label">{param.label}</span>
+            <span className="ind-param-label">{t(param.labelKey)}</span>
             <div className="ind-param-controls">
               <button
                 className="ind-param-btn"
@@ -174,6 +176,7 @@ function ParamsEditor({ ind }: { ind: Indicator }) {
 }
 
 export default function IndicatorsOverlay() {
+  const { t } = useI18n();
   const setOverlay = useStore(s => s.setOverlay);
   const activeInds = useStore(s => s.activeInds);
   const toggleInd = useStore(s => s.toggleInd);
@@ -184,9 +187,9 @@ export default function IndicatorsOverlay() {
       <div className="overlay-sheet" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
         <div className="overlay-handle" />
         <div className="overlay-header">
-          <span className="overlay-title">Indicators</span>
+          <span className="overlay-title">{t('ind.title')}</span>
           <div style={{ fontSize: 12, color: 'var(--t4)', marginRight: 8 }}>
-            {activeInds.length} active
+            {activeInds.length} {t('ind.active')}
           </div>
           <button className="overlay-close" onClick={() => setOverlay('none')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -210,7 +213,7 @@ export default function IndicatorsOverlay() {
                     </div>
                     <div className="ind-info">
                       <div className="ind-name">{ind.name}</div>
-                      <div className="ind-desc">{ind.desc}</div>
+                      <div className="ind-desc">{t(ind.descKey)}</div>
                     </div>
                     {ind.params && isActive && (
                       <span style={{ fontSize: 10, color: 'var(--t4)', marginRight: 6 }}>

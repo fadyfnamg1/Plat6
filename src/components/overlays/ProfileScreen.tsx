@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
+import { useI18n } from '../../lib/i18n';
 
 const BACKEND = 'https://oxier-backend-production.up.railway.app';
 
@@ -11,6 +12,7 @@ function hashPin(pin: string): string {
 }
 
 export default function ProfileScreen() {
+  const { t: tr } = useI18n();
   const setOverlay  = useStore(s => s.setOverlay);
   const userInfo    = useStore(s => s.userInfo);
   const setUserInfo = useStore(s => s.setUserInfo);
@@ -184,7 +186,7 @@ export default function ProfileScreen() {
         <button className="fs-back" onClick={() => setOverlay('panel')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <span className="fs-title">My Profile</span>
+        <span className="fs-title">{tr('app.panel.profile')}</span>
       </div>
       <div className="fs-body">
         {/* Avatar */}
@@ -197,9 +199,9 @@ export default function ProfileScreen() {
         {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:20 }}>
           {[
-            { label:'Trades',   val: resolved.length },
-            { label:'Win Rate', val: resolved.length ? `${Math.round(wins.length/resolved.length*100)}%` : '—' },
-            { label:'P&L',      val: `${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(0)}`, color: totalPnl >= 0 ? 'var(--g0)' : 'var(--red)' },
+            { label:tr('app.panel.trades'), val: resolved.length },
+            { label:tr('app.panel.winRate'), val: resolved.length ? `${Math.round(wins.length/resolved.length*100)}%` : '—' },
+            { label:tr('app.panel.pnl'), val: `${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(0)}`, color: totalPnl >= 0 ? 'var(--g0)' : 'var(--red)' },
           ].map((s,i) => (
             <div key={i} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--r2)', padding:'12px 8px', textAlign:'center' }}>
               <div style={{ fontSize:16, fontWeight:800, color: s.color || 'var(--t1)', fontFamily:'JetBrains Mono' }}>{s.val}</div>
@@ -210,10 +212,10 @@ export default function ProfileScreen() {
 
         {/* Tabs */}
         <div className="profile-tabs" style={{ marginBottom:16 }}>
-          {(['info','security','danger'] as const).map(t => (
-            <button key={t} className={`profile-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}
-              style={{ fontFamily:'inherit', color: t === 'danger' && tab === t ? 'var(--red)' : undefined }}>
-              {t === 'info' ? 'Info' : t === 'security' ? 'Security' : '⚠ Delete'}
+          {(['info','security','danger'] as const).map(tabId => (
+            <button key={tabId} className={`profile-tab ${tab === tabId ? 'active' : ''}`} onClick={() => setTab(tabId)}
+              style={{ fontFamily:'inherit', color: tabId === 'danger' && tab === tabId ? 'var(--red)' : undefined }}>
+              {tabId === 'info' ? tr('prof.tabInfo') : tabId === 'security' ? tr('prof.tabSecurity') : tr('prof.tabDelete')}
             </button>
           ))}
         </div>
@@ -222,15 +224,15 @@ export default function ProfileScreen() {
         {tab === 'info' && (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             <div className="auth-field">
-              <label>Display Name</label>
-              <input className="auth-input" value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" />
+              <label>{tr('prof.displayName')}</label>
+              <input className="auth-input" value={name} onChange={e => setName(e.target.value)} placeholder={tr('prof.namePlaceholder')} />
             </div>
             <div className="auth-field">
-              <label>Email Address</label>
+              <label>{tr('prof.emailAddress')}</label>
               <input className="auth-input" value={email} readOnly style={{ opacity:.6 }} />
             </div>
             <button className={`auth-btn ${saving ? 'loading' : ''}`} onClick={save} disabled={saving}>
-              {saving ? '' : 'Save Changes'}
+              {saving ? '' : tr('prof.saveChanges')}
             </button>
           </div>
         )}
@@ -243,21 +245,21 @@ export default function ProfileScreen() {
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
                 <span style={{ fontSize:20 }}>🔢</span>
                 <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>PIN Code</div>
-                  <div style={{ fontSize:11, color:'var(--t4)' }}>Secure access with a numeric PIN</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{tr('prof.pinCode')}</div>
+                  <div style={{ fontSize:11, color:'var(--t4)' }}>{tr('prof.pinDesc')}</div>
                 </div>
               </div>
               <div style={{ display:'flex', gap:8 }}>
                 {pinSet
                   ? <>
                       <button onClick={() => { setPinDialog('setup'); setNewPin(''); setConfirmPin(''); setPinError(''); }}
-                        style={{ flex:1, padding:'8px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg1)', color:'var(--t1)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>Change PIN</button>
+                        style={{ flex:1, padding:'8px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg1)', color:'var(--t1)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>{tr('prof.changePin')}</button>
                       <button onClick={removePin}
-                        style={{ flex:1, padding:'8px 0', borderRadius:8, border:'1px solid rgba(255,61,87,.3)', background:'rgba(255,61,87,.1)', color:'var(--red)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>Remove</button>
+                        style={{ flex:1, padding:'8px 0', borderRadius:8, border:'1px solid rgba(255,61,87,.3)', background:'rgba(255,61,87,.1)', color:'var(--red)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>{tr('prof.remove')}</button>
                     </>
                   : <button onClick={() => { setPinDialog('setup'); setNewPin(''); setConfirmPin(''); setPinError(''); }}
                       style={{ width:'100%', padding:'9px 0', borderRadius:8, border:'1px solid rgba(0,230,118,.3)', background:'rgba(0,230,118,.1)', color:'var(--g0)', fontWeight:700, cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>
-                      Set up PIN
+                      {tr('prof.setupPin')}
                     </button>
                 }
               </div>
@@ -268,9 +270,9 @@ export default function ProfileScreen() {
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
                 <span style={{ fontSize:20 }}>🔑</span>
                 <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>Passkey / Biometric</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{tr('prof.passkeyTitle')}</div>
                   <div style={{ fontSize:11, color:'var(--t4)' }}>
-                    {passkeySupported ? 'Use fingerprint, Face ID, or device PIN' : 'Not supported on this browser'}
+                    {passkeySupported ? tr('prof.passkeySupported') : tr('prof.passkeyNotSupported')}
                   </div>
                 </div>
               </div>
@@ -278,25 +280,25 @@ export default function ProfileScreen() {
                 passkeyReg
                   ? <div style={{ display:'flex', gap:8 }}>
                       <div style={{ flex:1, padding:'9px 12px', borderRadius:8, background:'rgba(0,230,118,.08)', border:'1px solid rgba(0,230,118,.2)', color:'var(--g0)', fontSize:12, fontWeight:600 }}>
-                        ✓ Passkey registered
+                        {tr('prof.passkeyRegistered')}
                       </div>
                       <button onClick={removePasskey}
-                        style={{ padding:'9px 12px', borderRadius:8, border:'1px solid rgba(255,61,87,.3)', background:'rgba(255,61,87,.1)', color:'var(--red)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>Remove</button>
+                        style={{ padding:'9px 12px', borderRadius:8, border:'1px solid rgba(255,61,87,.3)', background:'rgba(255,61,87,.1)', color:'var(--red)', fontWeight:600, cursor:'pointer', fontSize:12, fontFamily:'inherit' }}>{tr('prof.remove')}</button>
                     </div>
                   : <button onClick={registerPasskey}
                       style={{ width:'100%', padding:'9px 0', borderRadius:8, border:'1px solid rgba(59,130,246,.3)', background:'rgba(59,130,246,.1)', color:'#3B82F6', fontWeight:700, cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>
-                      Register Passkey
+                      {tr('prof.registerPasskey')}
                     </button>
               )}
             </div>
 
             {/* Change password */}
             <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'var(--r2)', padding:16 }}>
-              <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>Change Password</div>
-              <div style={{ fontSize:11, color:'var(--t4)', marginBottom:10 }}>Update your account password via email</div>
+              <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', marginBottom:4 }}>{tr('prof.changePassword')}</div>
+              <div style={{ fontSize:11, color:'var(--t4)', marginBottom:10 }}>{tr('prof.changePasswordDesc')}</div>
               <button onClick={() => showToast('Password reset link sent to your email!')}
                 style={{ width:'100%', padding:'9px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg1)', color:'var(--t1)', fontWeight:600, cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>
-                Send Reset Link
+                {tr('prof.sendResetLink')}
               </button>
             </div>
           </div>
@@ -308,13 +310,13 @@ export default function ProfileScreen() {
             <div style={{ background:'rgba(255,61,87,.06)', border:'1px solid rgba(255,61,87,.2)', borderRadius:'var(--r2)', padding:16 }}>
               <div style={{ fontSize:14, fontWeight:700, color:'var(--red)', marginBottom:6 }}>⚠ Delete Account</div>
               <div style={{ fontSize:13, color:'var(--t3)', marginBottom:12 }}>
-                This action is <strong style={{ color:'var(--red)' }}>permanent and irreversible</strong>.
-                All your data, trade history, and balances will be permanently deleted.
+                {tr('prof.deleteWarning')}<br/>
+                {tr('prof.deleteWarningSub')}
               </div>
               <button
                 onClick={() => { setDeleteDialog(true); setDeleteStep('confirm'); setDeleteOtp(''); setDeletePass(''); }}
                 style={{ width:'100%', padding:'11px 0', borderRadius:8, border:'1px solid rgba(255,61,87,.4)', background:'rgba(255,61,87,.15)', color:'var(--red)', fontWeight:700, cursor:'pointer', fontSize:14, fontFamily:'inherit' }}>
-                Delete My Account
+                {tr('prof.deleteMyAccount')}
               </button>
             </div>
           </div>
@@ -326,19 +328,19 @@ export default function ProfileScreen() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ background:'var(--bg1)', borderRadius:16, padding:24, minWidth:260, border:'1px solid var(--border)' }}>
             <div style={{ fontSize:16, fontWeight:700, color:'var(--t1)', marginBottom:16, textAlign:'center' }}>
-              {!newPin || newPin.length < 4 ? 'Enter new PIN' : 'Confirm PIN'}
+              {!newPin || newPin.length < 4 ? tr('prof.enterNewPin') : tr('prof.confirmPinTitle')}
             </div>
             {(!newPin || newPin.length < 4)
-              ? <PinPad value={newPin} onChange={setNewPin} label="New PIN (4-6 digits)" maxLen={6} />
-              : <PinPad value={confirmPin} onChange={setConfirmPin} label="Confirm PIN" maxLen={6} />
+              ? <PinPad value={newPin} onChange={setNewPin} label={tr('prof.newPinLabel')} maxLen={6} />
+              : <PinPad value={confirmPin} onChange={setConfirmPin} label={tr('prof.confirmPinLabel')} maxLen={6} />
             }
             {pinError && <div style={{ color:'var(--red)', fontSize:12, textAlign:'center', marginTop:8 }}>{pinError}</div>}
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
               <button onClick={() => { setPinDialog(null); setNewPin(''); setConfirmPin(''); setPinError(''); }}
-                style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>Cancel</button>
+                style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{tr('prof.cancel')}</button>
               {newPin.length >= 4 && confirmPin.length >= 4 && (
                 <button onClick={setupPin}
-                  style={{ flex:1, padding:'10px 0', borderRadius:8, border:'none', background:'var(--g0)', color:'#04060C', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Save PIN</button>
+                  style={{ flex:1, padding:'10px 0', borderRadius:8, border:'none', background:'var(--g0)', color:'#04060C', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>{tr('prof.savePin')}</button>
               )}
             </div>
           </div>
@@ -349,40 +351,40 @@ export default function ProfileScreen() {
       {deleteDialog && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.7)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <div style={{ background:'var(--bg1)', borderRadius:16, padding:24, minWidth:300, maxWidth:360, border:'1px solid rgba(255,61,87,.3)' }}>
-            <div style={{ fontSize:16, fontWeight:700, color:'var(--red)', marginBottom:8, textAlign:'center' }}>🗑 Delete Account</div>
+            <div style={{ fontSize:16, fontWeight:700, color:'var(--red)', marginBottom:8, textAlign:'center' }}>{tr('prof.deleteAccountDialogTitle')}</div>
             {deleteStep === 'confirm' ? (
               <>
                 <div style={{ fontSize:13, color:'var(--t3)', textAlign:'center', marginBottom:16 }}>
-                  First, we'll send a verification OTP to <strong>{email}</strong>
+                  {tr('prof.otpSendNote')} <strong>{email}</strong>
                 </div>
                 <div className="auth-field" style={{ marginBottom:12 }}>
-                  <label>Current Password</label>
-                  <input className="auth-input" type="password" value={deletePass} onChange={e => setDeletePass(e.target.value)} placeholder="Enter your password" />
+                  <label>{tr('prof.currentPassword')}</label>
+                  <input className="auth-input" type="password" value={deletePass} onChange={e => setDeletePass(e.target.value)} placeholder={tr('prof.enterPasswordPlaceholder')} />
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => setDeleteDialog(false)}
-                    style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>Cancel</button>
+                    style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{tr('prof.cancel')}</button>
                   <button onClick={sendDeleteOtp} disabled={sendingOtp || !deletePass}
                     style={{ flex:1, padding:'10px 0', borderRadius:8, border:'none', background:'rgba(255,61,87,.8)', color:'#fff', fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: sendingOtp || !deletePass ? .5 : 1 }}>
-                    {sendingOtp ? 'Sending…' : 'Send OTP'}
+                    {sendingOtp ? tr('prof.sending') : tr('prof.sendOtp')}
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <div style={{ fontSize:13, color:'var(--t3)', textAlign:'center', marginBottom:16 }}>
-                  Enter the OTP sent to your email
+                  {tr('prof.otpEnterNote')}
                 </div>
                 <div className="auth-field" style={{ marginBottom:12 }}>
-                  <label>Verification Code</label>
-                  <input className="auth-input" value={deleteOtp} onChange={e => setDeleteOtp(e.target.value)} placeholder="6-digit OTP" maxLength={6} style={{ fontFamily:'JetBrains Mono', letterSpacing:4 }} />
+                  <label>{tr('prof.verificationCode')}</label>
+                  <input className="auth-input" value={deleteOtp} onChange={e => setDeleteOtp(e.target.value)} placeholder={tr('prof.otpPlaceholder')} maxLength={6} style={{ fontFamily:'JetBrains Mono', letterSpacing:4 }} />
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={() => setDeleteDialog(false)}
-                    style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>Cancel</button>
+                    style={{ flex:1, padding:'10px 0', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{tr('prof.cancel')}</button>
                   <button onClick={deleteAccount} disabled={deleting || !deleteOtp}
                     style={{ flex:1, padding:'10px 0', borderRadius:8, border:'none', background:'var(--red)', color:'#fff', fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: deleting || !deleteOtp ? .5 : 1 }}>
-                    {deleting ? 'Deleting…' : 'Confirm Delete'}
+                    {deleting ? tr('prof.deleting') : tr('prof.confirmDelete')}
                   </button>
                 </div>
               </>

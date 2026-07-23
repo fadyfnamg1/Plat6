@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
 import { apiFetch } from '../../lib/api';
+import { useI18n } from '../../lib/i18n';
 
 interface ApiEvent {
   id: string;
@@ -15,52 +16,37 @@ interface ApiEvent {
   terms?: string;
 }
 
-// Fallback events shown while API loads or if backend is offline
-const FALLBACK_EVENTS: ApiEvent[] = [
+// Fallback events shown while API loads or if backend is offline.
+// Title/date/desc/prize/terms are translation keys, resolved via t() below.
+const FALLBACK_EVENTS = [
   {
-    id: 'oxier100',
-    type: 'promo',
-    title: '100% First Deposit Bonus',
-    date: 'Always active',
-    desc: 'Get a 100% bonus on your very first deposit. Enter code OXIER100 in the bonus code field when depositing. Bonus funds are non-withdrawable and will be automatically deducted upon any withdrawal request.',
-    prize: '100% Bonus',
-    color: '#00E676',
-    ico: '🎁',
-    promoCode: 'OXIER100',
-    terms: 'Valid on first deposit only. Bonus is non-withdrawable.',
+    id: 'oxier100', type: 'promo',
+    titleKey: 'ev.fb1Title', dateKey: 'ev.fb1Date', descKey: 'ev.fb1Desc', prizeKey: 'ev.fb1Prize', termsKey: 'ev.fb1Terms',
+    color: '#00E676', ico: '🎁', promoCode: 'OXIER100',
   },
   {
-    id: 'refer',
-    type: 'promo',
-    title: 'Refer & Earn',
-    date: 'Ongoing',
-    desc: 'Share your unique referral code with friends and earn 10% commission on every trade they make. No cap on earnings.',
-    prize: '10% Commission',
-    color: '#10B981',
-    ico: '💰',
-    promoCode: null,
-    terms: 'Commission credited automatically when referred users trade.',
+    id: 'refer', type: 'promo',
+    titleKey: 'ev.fb2Title', dateKey: 'ev.fb2Date', descKey: 'ev.fb2Desc', prizeKey: 'ev.fb2Prize', termsKey: 'ev.fb2Terms',
+    color: '#10B981', ico: '💰', promoCode: null,
   },
   {
-    id: 'loyalty',
-    type: 'promo',
-    title: 'Weekly Loyalty Cashback',
-    date: 'Every Monday',
-    desc: 'Active traders receive weekly cashback on net losses from the previous week. The more you trade, the higher your cashback tier.',
-    prize: 'Up to 15% Cashback',
-    color: '#8B5CF6',
-    ico: '⭐',
-    promoCode: null,
-    terms: 'Calculated every Monday. Applied automatically.',
+    id: 'loyalty', type: 'promo',
+    titleKey: 'ev.fb3Title', dateKey: 'ev.fb3Date', descKey: 'ev.fb3Desc', prizeKey: 'ev.fb3Prize', termsKey: 'ev.fb3Terms',
+    color: '#8B5CF6', ico: '⭐', promoCode: null,
   },
 ];
 
+function evField(ev: any, keyField: string, plainField: string, t: (k: string) => string): string {
+  return ev[keyField] ? t(ev[keyField]) : ev[plainField];
+}
+
 export default function EventsOverlay() {
+  const { t } = useI18n();
   const setOverlay  = useStore(s => s.setOverlay);
   const showToast   = useStore(s => s.showToast);
   const userInfo    = useStore(s => s.userInfo);
 
-  const [events, setEvents]         = useState<ApiEvent[]>(FALLBACK_EVENTS);
+  const [events, setEvents]         = useState<(ApiEvent | typeof FALLBACK_EVENTS[0])[]>(FALLBACK_EVENTS);
   const [coupon, setCoupon]          = useState('');
   const [validating, setValidating]  = useState(false);
   const [promoResult, setPromoResult]= useState<{ ok: boolean; msg: string } | null>(null);
@@ -115,7 +101,7 @@ export default function EventsOverlay() {
       <div className="overlay-sheet" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
         <div className="overlay-handle" />
         <div className="overlay-header">
-          <span className="overlay-title">Events & Promotions</span>
+          <span className="overlay-title">{t('ev.title')}</span>
           <button className="overlay-close" onClick={() => setOverlay('none')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -129,14 +115,14 @@ export default function EventsOverlay() {
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="coupon-input"
-                placeholder="Enter promo code..."
+                placeholder={t('ev.enterPromoCode')}
                 value={coupon}
                 onChange={e => { setCoupon(e.target.value); setPromoResult(null); }}
                 onKeyDown={e => e.key === 'Enter' && applyPromo()}
                 style={{ textTransform: 'uppercase' }}
               />
               <button className="coupon-btn" onClick={applyPromo} disabled={validating}>
-                {validating ? '…' : 'Validate'}
+                {validating ? '…' : t('ev.validate')}
               </button>
             </div>
             {promoResult && (
@@ -151,7 +137,7 @@ export default function EventsOverlay() {
               </div>
             )}
             <div style={{ fontSize: 11, color: 'var(--t4)' }}>
-              Validate first, then enter the code in the <strong style={{ color: 'var(--t3)' }}>Deposit</strong> screen.
+              {t('ev.validateFirst')} <strong style={{ color: 'var(--t3)' }}>{t('app.panel.deposit')}</strong> {t('ev.depositScreenSuffix')}
             </div>
           </div>
 
@@ -161,20 +147,20 @@ export default function EventsOverlay() {
               <div className="event-header">
                 <div className="event-ico" style={{ background: `${ev.color}14`, fontSize: 24 }}>{ev.ico}</div>
                 <div>
-                  <div className="event-title">{ev.title}</div>
-                  <div className="event-date">{ev.date}</div>
+                  <div className="event-title">{evField(ev, 'titleKey', 'title', t)}</div>
+                  <div className="event-date">{evField(ev, 'dateKey', 'date', t)}</div>
                 </div>
               </div>
-              <div className="event-desc">{ev.desc}</div>
+              <div className="event-desc">{evField(ev, 'descKey', 'desc', t)}</div>
 
-              {ev.terms && (
+              {(ev.termsKey || ev.terms) && (
                 <div style={{ fontSize: 11, color: 'var(--t4)', marginTop: 6, fontStyle: 'italic' }}>
-                  {ev.terms}
+                  {evField(ev, 'termsKey', 'terms', t)}
                 </div>
               )}
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-                <span className="event-prize" style={{ color: ev.color }}>{ev.prize}</span>
+                <span className="event-prize" style={{ color: ev.color }}>{evField(ev, 'prizeKey', 'prize', t)}</span>
 
                 {ev.promoCode ? (
                   <button
@@ -199,7 +185,7 @@ export default function EventsOverlay() {
                       cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
                     }}
                   >
-                    Learn More
+                    {t('ev.learnMore')}
                   </button>
                 )}
               </div>

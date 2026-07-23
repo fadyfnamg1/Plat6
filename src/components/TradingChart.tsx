@@ -6,6 +6,7 @@ import {
   calcCCI, calcATR, calcStoch, calcWilliams, calcVolume,
   calcVWAP, calcWMA, calcDonchian, calcADX, calcMomentum, calcMFI,
 } from '../lib/markets';
+import { useI18n } from '../lib/i18n';
 import type { TF } from '../lib/markets';
 
 // All timeframes in display order
@@ -82,7 +83,7 @@ function loadLWC(): Promise<void> {
 }
 
 // ─── Drawing types ────────────────────────────────────────────────────────────
-type DrawTool = 'trendline'|'hline'|'ray'|'hray'|'rectangle'|'ellipse'|'fibonacci'|'fibext'|'channel'|'vline'|'arrow'|'triangle'|'pitchfork';
+type DrawTool = 'trendline'|'hline'|'ray'|'hray'|'rectangle'|'ellipse'|'fibonacci'|'fibext'|'fibfan'|'fibchannel'|'daterange'|'channel'|'vline'|'arrow'|'triangle'|'pitchfork';
 
 // Store drawings in TIME coordinates (unix timestamp) so they stay anchored
 // to the correct candle across timeframe changes and resizes.
@@ -107,6 +108,7 @@ const DEFAULT_COLORS = [
 const TOOL_COLORS: Record<DrawTool, string> = {
   trendline: '#F59E0B', hline: '#60A5FA', ray: '#A78BFA', hray: '#C084FC',
   rectangle: '#34D399', ellipse: '#2DD4BF', fibonacci: '#F472B6', fibext: '#F0ABFC',
+  fibfan: '#FDE047', fibchannel: '#4ADE80', daterange: '#38BDF8',
   channel: '#22D3EE', vline: '#FB923C', arrow: '#FBBF24', triangle: '#86efac', pitchfork: '#f97316',
 };
 
@@ -116,39 +118,64 @@ const FIB_EXT_LEVELS = [0, 0.618, 1, 1.272, 1.618, 2, 2.618];
 const FIB_EXT_COLORS = ['#94a3b8','#22c55e','#eab308','#3b82f6','#8b5cf6','#ec4899','#ef4444'];
 
 // ─── Tool groups ──────────────────────────────────────────────────────────────
-interface Tool { id: DrawTool | null; label: string; icon: string; }
+interface Tool { id: DrawTool | null; labelKey: string; icon: string; }
 
-const TOOL_GROUPS: { label: string; tools: Tool[] }[] = [
+const TOOL_GROUPS: { labelKey: string; tools: Tool[] }[] = [
   {
-    label: 'Lines',
+    labelKey: 'tool.groupLines',
     tools: [
-      { id: null,        label: 'Cursor',     icon: '↖' },
-      { id: 'trendline', label: 'Trend Line', icon: '↗' },
-      { id: 'ray',       label: 'Ray',        icon: '→' },
-      { id: 'hray',      label: 'H-Ray',      icon: '⇥' },
-      { id: 'hline',     label: 'H-Line',     icon: '—' },
-      { id: 'vline',     label: 'V-Line',     icon: '|' },
-      { id: 'arrow',     label: 'Arrow',      icon: '⇗' },
+      { id: null,        labelKey: 'tool.cursor',    icon: '↖' },
+      { id: 'trendline', labelKey: 'tool.trendLine', icon: '↗' },
+      { id: 'ray',       labelKey: 'tool.ray',       icon: '→' },
+      { id: 'hray',      labelKey: 'tool.hray',      icon: '⇥' },
+      { id: 'hline',     labelKey: 'tool.hline',     icon: '—' },
+      { id: 'vline',     labelKey: 'tool.vline',     icon: '|' },
+      { id: 'arrow',     labelKey: 'tool.arrow',     icon: '⇗' },
     ],
   },
   {
-    label: 'Shapes',
+    labelKey: 'tool.groupShapes',
     tools: [
-      { id: 'rectangle', label: 'Rectangle', icon: '▭' },
-      { id: 'ellipse',   label: 'Ellipse',   icon: '◯' },
-      { id: 'triangle',  label: 'Triangle',  icon: '△' },
-      { id: 'channel',   label: 'Channel',   icon: '≡' },
+      { id: 'rectangle', labelKey: 'tool.rectangle', icon: '▭' },
+      { id: 'ellipse',   labelKey: 'tool.ellipse',   icon: '◯' },
+      { id: 'triangle',  labelKey: 'tool.triangle',  icon: '△' },
+      { id: 'channel',   labelKey: 'tool.channel',   icon: '≡' },
     ],
   },
   {
-    label: 'Patterns',
+    labelKey: 'tool.groupPatterns',
     tools: [
-      { id: 'fibonacci', label: 'Fibonacci',      icon: 'ϕ' },
-      { id: 'fibext',    label: 'Fib Extension',  icon: 'Ϝ' },
-      { id: 'pitchfork', label: 'Pitchfork',      icon: '⑃' },
+      { id: 'fibonacci',   labelKey: 'tool.fibonacci',   icon: 'ϕ' },
+      { id: 'fibext',      labelKey: 'tool.fibext',      icon: 'Ϝ' },
+      { id: 'fibfan',      labelKey: 'tool.fibfan',      icon: 'Λ' },
+      { id: 'fibchannel',  labelKey: 'tool.fibchannel',  icon: '≣' },
+      { id: 'daterange',   labelKey: 'tool.daterange',   icon: '↔' },
+      { id: 'pitchfork',   labelKey: 'tool.pitchfork',   icon: '⑃' },
     ],
   },
 ];
+
+// ─── Future "whitespace" padding ──────────────────────────────────────────────
+// lightweight-charts only knows how to map a pixel to a time for coordinates
+// that fall on (or between) actual data points. Without this, dragging a
+// drawing past the last candle has nowhere to land and it snaps back to the
+// last candle. Appending whitespace points (time only, no OHLC) — a feature
+// built into lightweight-charts specifically for this — gives the time axis
+// real coordinates to extend into, so drawings (Fibonacci, trend lines, etc.)
+// can be projected into the future the way traders normally use them.
+const FUTURE_WHITESPACE_BARS = 150;
+function withFutureWhitespace<T extends { time: number }>(data: T[], intervalSec: number, count = FUTURE_WHITESPACE_BARS): T[] {
+  if (!data.length || !intervalSec) return data;
+  const lastTime = data[data.length - 1].time;
+  const extra = Array.from({ length: count }, (_, i) => ({ time: lastTime + (i + 1) * intervalSec })) as T[];
+  return [...data, ...extra];
+}
+// Same idea, but returns ONLY the future points (no real data mixed in) —
+// used to feed the separate whitespace helper series.
+function futureWhitespaceOnly(lastTime: number, intervalSec: number, count = FUTURE_WHITESPACE_BARS): { time: number }[] {
+  if (!intervalSec) return [];
+  return Array.from({ length: count }, (_, i) => ({ time: lastTime + (i + 1) * intervalSec }));
+}
 
 // ─── Heikin Ashi calculation ──────────────────────────────────────────────────
 function calcHeikinAshi(bars: any[]): any[] {
@@ -167,6 +194,7 @@ function calcHeikinAshi(bars: any[]): any[] {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TradingChart() {
+  const { t } = useI18n();
   const currentMarket     = useStore(s => s.currentMarket);
   const currentTF         = useStore(s => s.currentTF);
   const setCurrentTF      = useStore(s => s.setCurrentTF);
@@ -181,18 +209,33 @@ export default function TradingChart() {
   const chartRef        = useRef<any>(null);
   const subChartRef     = useRef<any>(null);
   const mainSeriesRef   = useRef<any>(null);
+  // Invisible helper series holding ONLY the future whitespace points.
+  // Kept separate from mainSeriesRef so that mainSeries.update() (used for
+  // every live price tick) always sees a real bar as its own last data
+  // point — update() requires the new point's time to be >= the series'
+  // own last point, and whitespace 150 bars into the future would violate
+  // that and make every live update silently fail (candles frozen while
+  // the price ticker keeps moving). The time scale still extends into the
+  // future because it's the union of every series' data, so drawings can
+  // still be projected forward using this series alone.
+  const whitespaceSeriesRef = useRef<any>(null);
   const wsRef           = useRef<WebSocket | null>(null);
   const barsRef         = useRef<any[]>([]);
   const priceLinesRef   = useRef<Map<string, any>>(new Map());
   const shortTFTimerRef = useRef<any>(null);
   const wsStaleTimerRef = useRef<any>(null);
+  // Bumped every time buildChart() runs. Async work started by an older
+  // build (an in-flight fetch, a WebSocket that hasn't opened yet) checks
+  // this before touching shared refs/state, so a stale build can never
+  // clobber wsRef/barsRef or push a wrong-symbol price into the store
+  // after the user has already switched market/timeframe.
+  const buildIdRef      = useRef(0);
 
   const [lwcReady, setLwcReady]       = useState(false);
   const [chartType, setChartType]     = useState<ChartType>('Candles');
   const [hasSubChart, setHasSubChart] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [drawMode, setDrawMode]       = useState<DrawTool | null>(null);
-  const [selectionMode, setSelectionMode] = useState(false); // cursor/select mode
   const [toolsOpen, setToolsOpen]     = useState(false);
   const [drawings, setDrawings]       = useState<Drawing[]>([]);
   const [selectedId, setSelectedId]   = useState<string | null>(null);
@@ -205,6 +248,9 @@ export default function TradingChart() {
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   const drawingsRef    = useRef<Drawing[]>([]);
   const activeDrawRef  = useRef<Drawing | null>(null);
+  // Live preview of a drag-in-progress on an EXISTING drawing (see
+  // redrawCanvas above). null while nothing is being dragged.
+  const dragPreviewRef = useRef<Drawing | null>(null);
   const isDrawingRef   = useRef(false);
 
   const isDark      = theme === 'dark';
@@ -220,22 +266,58 @@ export default function TradingChart() {
   // ─── Coordinate conversion helpers ────────────────────────────────────────
   // Use TIME (unix timestamp) coordinates for drawings so they stay anchored
   // to the same candle when the user switches timeframe or resizes the chart.
+  // Seconds between two consecutive real candles at the current timeframe —
+  // used to extrapolate time/pixel positions past the last real bar so
+  // drawings can extend into the future instead of stopping dead at the
+  // last candle.
+  function _barIntervalSec(): number | null {
+    const bars = barsRef.current;
+    if (!bars || bars.length < 2) return null;
+    const iv = bars[bars.length - 1].time - bars[bars.length - 2].time;
+    return iv > 0 ? iv : null;
+  }
+
   function pixelToData(x: number, y: number): DataPoint | null {
     if (!chartRef.current || !mainSeriesRef.current) return null;
     try {
-      const time  = chartRef.current.timeScale().coordinateToTime(x) as number | null;
+      const ts = chartRef.current.timeScale();
       const price = mainSeriesRef.current.coordinateToPrice(y);
-      if (time == null || price == null) return null;
-      return { time, price };
+      if (price == null) return null;
+      let time = ts.coordinateToTime(x) as number | null;
+      if (time == null) {
+        // Past the last real candle: coordinateToTime only knows about
+        // actual data points, so fall back to the geometric logical-index
+        // mapping (always defined) and extrapolate a timestamp from it.
+        const bars = barsRef.current;
+        const iv = _barIntervalSec();
+        if (!bars?.length || !iv) return null;
+        const logical = ts.coordinateToLogical(x);
+        if (logical == null) return null;
+        const lastIdx = bars.length - 1;
+        time = bars[lastIdx].time + Math.round((logical - lastIdx) * iv);
+      }
+      return { time: time as number, price };
     } catch { return null; }
   }
 
   function dataToPixel(dp: DataPoint): { x: number; y: number } | null {
     if (!chartRef.current || !mainSeriesRef.current) return null;
     try {
-      const x = chartRef.current.timeScale().timeToCoordinate(dp.time);
+      const ts = chartRef.current.timeScale();
       const y = mainSeriesRef.current.priceToCoordinate(dp.price);
-      if (x == null || y == null) return null;
+      if (y == null) return null;
+      let x = ts.timeToCoordinate(dp.time);
+      if (x == null) {
+        // dp.time may be a future timestamp we invented above that has no
+        // matching real (or whitespace) bar yet — map it back the same way.
+        const bars = barsRef.current;
+        const iv = _barIntervalSec();
+        if (!bars?.length || !iv) return null;
+        const lastIdx = bars.length - 1;
+        const logical = lastIdx + (dp.time - bars[lastIdx].time) / iv;
+        x = ts.logicalToCoordinate(logical);
+        if (x == null) return null;
+      }
       return { x, y };
     } catch { return null; }
   }
@@ -248,7 +330,14 @@ export default function TradingChart() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const all = [...drawingsRef.current];
+    // While an existing drawing is being dragged (endpoint or whole shape),
+    // its live in-progress position lives here instead of in React state —
+    // same reasoning as activeDrawRef: touching setDrawings on every
+    // pointermove would re-render the whole component 60+ times/sec and
+    // make the drag feel choppy. The real drawings array is only updated
+    // once, when the drag finishes.
+    const dp = dragPreviewRef.current;
+    const all = dp ? drawingsRef.current.map(d => d.id === dp.id ? dp : d) : [...drawingsRef.current];
     if (activeDrawRef.current) all.push(activeDrawRef.current);
 
     for (const d of all) {
@@ -357,7 +446,10 @@ export default function TradingChart() {
         const right = Math.max(px1.x, px2.x);
         FIB_LEVELS.forEach((lvl, i) => {
           const lvlPrice = d.p1.price + priceRange * lvl;
-          const lvlData  = { logical: d.p1.logical, price: lvlPrice };
+          // BUGFIX: this used to build { logical: d.p1.logical, price } — but
+          // DataPoint only has {time, price}, so dataToPixel() always failed
+          // and every Fibonacci level line silently never rendered.
+          const lvlData  = { time: d.p1.time, price: lvlPrice };
           const lvlPx    = dataToPixel(lvlData);
           if (!lvlPx) return;
           ctx.strokeStyle = FIB_COLORS[i % FIB_COLORS.length];
@@ -380,7 +472,7 @@ export default function TradingChart() {
         const right = Math.max(px1.x, px2.x);
         FIB_EXT_LEVELS.forEach((lvl, i) => {
           const lvlPrice = d.p1.price + priceRange * lvl;
-          const lvlData  = { logical: d.p1.logical, price: lvlPrice };
+          const lvlData  = { time: d.p1.time, price: lvlPrice }; // same bugfix as above
           const lvlPx    = dataToPixel(lvlData);
           if (!lvlPx) return;
           ctx.strokeStyle = FIB_EXT_COLORS[i % FIB_EXT_COLORS.length];
@@ -391,6 +483,66 @@ export default function TradingChart() {
           ctx.font = '9px JetBrains Mono, monospace';
           ctx.fillText(`${(lvl * 100).toFixed(1)}%`, right + 4, lvlPx.y + 3);
         });
+
+      } else if (d.tool === 'fibfan') {
+        // Rays from p1 through the Fibonacci-ratio heights measured at p2's time.
+        if (!px2) continue;
+        const priceRange = d.p2.price - d.p1.price;
+        FIB_LEVELS.forEach((lvl, i) => {
+          const lvlPrice = d.p1.price + priceRange * lvl;
+          const lvlPx = dataToPixel({ time: d.p2.time, price: lvlPrice });
+          if (!lvlPx) return;
+          const dx = lvlPx.x - px1.x, dy = lvlPx.y - px1.y;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const t = (Math.max(canvas.width, canvas.height) * 4) / len;
+          ctx.strokeStyle = FIB_COLORS[i % FIB_COLORS.length];
+          ctx.lineWidth = lvl === 0 || lvl === 1 ? 1.5 : 1;
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(px1.x, px1.y); ctx.lineTo(px1.x + dx * t, px1.y + dy * t); ctx.stroke();
+        });
+        _dot(ctx, px1, d.color); _dot(ctx, px2, d.color);
+
+      } else if (d.tool === 'fibchannel') {
+        // Parallel lines through p1–p2, offset by Fibonacci fractions of the
+        // base leg's height — a channel version of the Fibonacci retracement.
+        if (!px2) continue;
+        const heightDiff = px2.y - px1.y;
+        FIB_LEVELS.forEach((lvl, i) => {
+          if (lvl === 0) return; // base line drawn separately below
+          const offset = heightDiff * lvl;
+          ctx.strokeStyle = FIB_COLORS[i % FIB_COLORS.length];
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(px1.x, px1.y - offset); ctx.lineTo(px2.x, px2.y - offset); ctx.stroke();
+        });
+        ctx.setLineDash([]);
+        ctx.strokeStyle = d.color; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(px1.x, px1.y); ctx.lineTo(px2.x, px2.y); ctx.stroke();
+        _dot(ctx, px1, d.color); _dot(ctx, px2, d.color);
+
+      } else if (d.tool === 'daterange') {
+        // "Measure" tool: shows elapsed time + % price change between two points.
+        if (!px2) continue;
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(px1.x, px1.y, px2.x - px1.x, px2.y - px1.y);
+        ctx.setLineDash([]);
+        ctx.fillStyle = d.color + '12';
+        ctx.fillRect(px1.x, px1.y, px2.x - px1.x, px2.y - px1.y);
+
+        const pct = d.p1.price !== 0 ? ((d.p2.price - d.p1.price) / d.p1.price) * 100 : 0;
+        const secs = Math.abs(d.p2.time - d.p1.time);
+        const timeLabel = secs < 60 ? `${secs}s` : secs < 3600 ? `${Math.round(secs / 60)}m` : secs < 86400 ? `${Math.round(secs / 3600)}h` : `${Math.round(secs / 86400)}d`;
+        const label = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%  ·  ${timeLabel}`;
+        const midX = (px1.x + px2.x) / 2;
+        const topY = Math.min(px1.y, px2.y);
+        ctx.font = 'bold 11px JetBrains Mono, monospace';
+        const tw = ctx.measureText(label).width + 16;
+        ctx.fillStyle = pct >= 0 ? 'rgba(0,214,143,.92)' : 'rgba(255,61,87,.92)';
+        ctx.fillRect(midX - tw / 2, topY - 24, tw, 20);
+        ctx.fillStyle = '#04070E';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, midX, topY - 10);
+        ctx.textAlign = 'left';
 
       } else if (d.tool === 'pitchfork') {
         if (!px2) continue;
@@ -405,7 +557,7 @@ export default function TradingChart() {
         _dot(ctx, px1, d.color); _dot(ctx, px2, d.color);
       }
 
-      // Selection highlight
+      // Selection highlight + draggable endpoint handles
       if (isSelected) {
         ctx.strokeStyle = '#ffffff33';
         ctx.lineWidth = 6;
@@ -413,10 +565,41 @@ export default function TradingChart() {
         if (px2 && d.tool !== 'hline' && d.tool !== 'vline') {
           ctx.beginPath(); ctx.moveTo(px1.x, px1.y); ctx.lineTo(px2.x, px2.y); ctx.stroke();
         }
+        // Grab handles — larger than the plain end-dots so they're easy to
+        // hit with a fingertip, letting the user drag either endpoint to
+        // adjust the drawing instead of deleting and redrawing it.
+        if (!drawMode) {
+          if (d.tool !== 'hline' && d.tool !== 'vline') _handle(ctx, px1, d.color);
+          if (px2) _handle(ctx, px2, d.color);
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId]);
+  }, [selectedId, drawMode]);
+
+  // Coalesces redraw requests to at most one per animation frame. Touch
+  // input can fire pointermove far faster than the screen refreshes
+  // (100+ events/sec on some phones); calling the (fairly expensive —
+  // fib fans, text labels, multiple strokes) redrawCanvas() synchronously
+  // for every single one of those piles up more paint work than the frame
+  // budget allows and is what actually reads as "choppy" while dragging,
+  // even though React itself is no longer re-rendering per move.
+  const rafPendingRef = useRef(false);
+  const scheduleRedraw = useCallback(() => {
+    if (rafPendingRef.current) return;
+    rafPendingRef.current = true;
+    requestAnimationFrame(() => {
+      rafPendingRef.current = false;
+      redrawCanvas();
+    });
+  }, [redrawCanvas]);
+
+  function _handle(ctx: CanvasRenderingContext2D, p: {x:number;y:number}, color: string) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI*2); ctx.stroke();
+  }
 
   function _dot(ctx: CanvasRenderingContext2D, p: {x:number;y:number}, color: string) {
     ctx.fillStyle = color;
@@ -464,17 +647,19 @@ export default function TradingChart() {
   // ─── Build / rebuild chart ─────────────────────────────────────────────────
   const buildChart = useCallback(() => {
     if (!lwcReady || !containerRef.current || !currentMarket) return;
+    const buildId = ++buildIdRef.current; // this build is now the only one allowed to write shared state
     priceLinesRef.current.clear();
     if (shortTFTimerRef.current) { clearInterval(shortTFTimerRef.current); shortTFTimerRef.current = null; }
     if (subChartRef.current) { try { subChartRef.current.remove(); } catch {} subChartRef.current = null; }
     if (chartRef.current)    { try { chartRef.current.remove(); }    catch {} chartRef.current    = null; }
+    whitespaceSeriesRef.current = null; // removed along with chartRef.current above
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
 
     const chart = LightweightCharts.createChart(containerRef.current, {
       layout: { background: { color: bg }, textColor },
       grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
       rightPriceScale: { borderColor, scaleMargins: { top: 0.08, bottom: 0.08 } },
-      timeScale: { borderColor, timeVisible: true, secondsVisible: true },
+      timeScale: { borderColor, timeVisible: true, secondsVisible: true, rightOffset: 20 },
       crosshair: { mode: 1 },
       // CRITICAL: handleScroll and handleScale must be true so chart can zoom/pan
       handleScroll: true,
@@ -503,16 +688,25 @@ export default function TradingChart() {
     }
     mainSeriesRef.current = mainSeries;
 
+    // Transparent helper series — carries only future whitespace points so
+    // the time scale extends forward without ever touching mainSeries'
+    // own data (see whitespaceSeriesRef comment above).
+    const whitespaceSeries = chart.addLineSeries({
+      color: 'transparent', lineWidth: 1,
+      lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+    });
+    whitespaceSeriesRef.current = whitespaceSeries;
+
     const hasSubInd = activeInds.some(id => ['rsi','macd','stoch','williams','cci','atr','volume','adx','momentum','mfi'].includes(id));
     setHasSubChart(hasSubInd);
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => redrawCanvas());
 
-    loadData(chart, mainSeries, hasSubInd);
+    loadData(chart, mainSeries, hasSubInd, buildId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lwcReady, currentMarket, currentTF, chartType, theme, activeInds, indicatorSettings]);
+  }, [lwcReady, currentMarket?.symbol, currentTF, chartType, theme, activeInds, indicatorSettings]);
 
-  async function loadData(chart: any, mainSeries: any, hasSubInd: boolean) {
+  async function loadData(chart: any, mainSeries: any, hasSubInd: boolean, buildId: number) {
     if (!currentMarket) return;
     setLoading(true);
     let bars: any[];
@@ -531,22 +725,39 @@ export default function TradingChart() {
       bars = genSimData(currentMarket.price, currentTF, 500);
     }
 
+    // A newer buildChart() ran while we were awaiting the fetch above (fast
+    // market/timeframe switch). This build is stale — bail out before
+    // touching barsRef/wsRef/mainSeries or pushing a wrong-symbol price
+    // into the store. The chart/mainSeries this build was working with may
+    // already be .remove()'d.
+    if (buildId !== buildIdRef.current) return;
+
     barsRef.current = bars;
     // Transform bars for special chart types
     const haData = chartType === 'HeikinAshi' ? calcHeikinAshi(bars) : bars;
     const data = (chartType === 'Candles' || chartType === 'HeikinAshi' || chartType === 'Bars')
       ? haData
       : bars.map(b => ({ time: b.time, value: b.close }));
+    const tfSecForPad = TIMEFRAMES[currentTF].sec;
     try { mainSeries.setData(data); } catch {}
-    chart.timeScale().fitContent();
+    try {
+      whitespaceSeriesRef.current?.setData(futureWhitespaceOnly(data[data.length - 1].time, tfSecForPad));
+    } catch {}
+    // Fit the real bars (as fitContent() used to) but leave a chunk of the
+    // future whitespace visible on the right so there's obvious empty room
+    // to draw Fibonacci/trend-line projections into, instead of jumping to
+    // the full 150-bar padding.
+    try {
+      chart.timeScale().setVisibleLogicalRange({ from: 0, to: data.length - 1 + 20 });
+    } catch { chart.timeScale().fitContent(); }
     setLoading(false);
     applyMainIndicators(chart, bars);
     if (hasSubInd) buildSubChart(bars);
 
     if (isShortTF) {
-      connectShortTFTimer(mainSeries, chart);
+      connectShortTFTimer(mainSeries, chart, buildId);
     } else {
-      connectWS(mainSeries, chart);
+      connectWS(mainSeries, chart, buildId);
     }
     setTimeout(() => redrawCanvas(), 100);
   }
@@ -664,7 +875,7 @@ export default function TradingChart() {
   }
 
   // ─── Short timeframe live simulation ─────────────────────────────────────
-  function connectShortTFTimer(mainSeries: any, chart: any) {
+  function connectShortTFTimer(mainSeries: any, chart: any, buildId: number) {
     if (!currentMarket) return;
     const tfSec = TIMEFRAMES[currentTF].sec;
     let lastBar = barsRef.current[barsRef.current.length - 1];
@@ -682,6 +893,10 @@ export default function TradingChart() {
     fetchPrice();
 
     shortTFTimerRef.current = setInterval(async () => {
+      // A newer build has taken over (market/timeframe switched) — this
+      // interval belongs to the old one and must not push its price into
+      // the store or touch a mainSeries that's already been removed.
+      if (buildId !== buildIdRef.current) { clearInterval(shortTFTimerRef.current); return; }
       tickCount++;
       const now = Math.floor(Date.now() / 1000);
       const barStart = Math.floor(now / tfSec) * tfSec;
@@ -689,6 +904,7 @@ export default function TradingChart() {
       // Fetch real price every 2 ticks (every 1s) instead of every 500ms
       // to avoid flooding the network on mobile and causing freezes.
       if (tickCount % 2 === 0) await fetchPrice();
+      if (buildId !== buildIdRef.current) return; // stale after the awaited fetch too
       setLivePrice(currentPrice);
 
       if (!lastBar || barStart > lastBar.time) {
@@ -697,6 +913,9 @@ export default function TradingChart() {
         barsRef.current.push(newBar);
         if (barsRef.current.length > 1000) barsRef.current.shift();
         lastBar = newBar;
+        // Top up the future whitespace so the projectable space for
+        // drawings doesn't shrink as the session runs long.
+        try { whitespaceSeriesRef.current?.update({ time: newBar.time + FUTURE_WHITESPACE_BARS * tfSec }); } catch {}
       } else {
         // Update current candle
         lastBar.close = currentPrice;
@@ -711,14 +930,22 @@ export default function TradingChart() {
   }
 
   // ─── WebSocket for normal timeframes ──────────────────────────────────────
-  function connectWS(mainSeries: any, chart: any) {
+  function connectWS(mainSeries: any, chart: any, buildId: number) {
     if (!currentMarket) return;
     const sym = currentMarket.symbol.toLowerCase();
     let lastMsgAt = Date.now();
 
     function open() {
+      // Another buildChart() has already taken over — don't even open the
+      // socket for a market/timeframe combo that's no longer on screen.
+      if (buildId !== buildIdRef.current) return;
       const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${sym}@kline_${TIMEFRAMES[currentTF].binance}`);
       ws.onmessage = (e) => {
+        // Stale build: a market/timeframe switch happened after this socket
+        // was opened. Ignore the message instead of overwriting wsRef,
+        // barsRef, or the shared livePrice with data for a symbol that's
+        // no longer the one being displayed/traded.
+        if (buildId !== buildIdRef.current) { try { ws.close(); } catch {} return; }
         lastMsgAt = Date.now();
         const d = JSON.parse(e.data), k = d.k;
         const closePrice = parseFloat(k.c);
@@ -731,14 +958,19 @@ export default function TradingChart() {
         const bars = barsRef.current;
         const last = bars[bars.length-1];
         if (last && bar.time === last.time) bars[bars.length-1] = bar;
-        else { bars.push(bar); if (bars.length > 1000) bars.shift(); }
+        else {
+          bars.push(bar); if (bars.length > 1000) bars.shift();
+          // Top up the future whitespace so the projectable space for
+          // drawings doesn't shrink as the session runs long.
+          try { whitespaceSeriesRef.current?.update({ time: bar.time + FUTURE_WHITESPACE_BARS * TIMEFRAMES[currentTF].sec }); } catch {}
+        }
         const upd = (chartType === 'Candles' || chartType === 'HeikinAshi' || chartType === 'Bars')
           ? bar : { time: bar.time, value: bar.close };
         try { mainSeries.update(upd); } catch {}
       };
       // Only reconnect if this socket is still the active one — avoids a
       // reconnect loop firing after an intentional teardown (unmount/rebuild).
-      ws.onclose = () => { if (wsRef.current === ws) setTimeout(open, 1500); };
+      ws.onclose = () => { if (wsRef.current === ws && buildId === buildIdRef.current) setTimeout(open, 1500); };
       ws.onerror = () => { try { ws.close(); } catch {} };
       wsRef.current = ws;
     }
@@ -748,6 +980,7 @@ export default function TradingChart() {
     // firing onclose/onerror. If no kline update arrives for 8s, force a
     // reconnect so the chart (and live price) don't silently freeze.
     wsStaleTimerRef.current = setInterval(() => {
+      if (buildId !== buildIdRef.current) { clearInterval(wsStaleTimerRef.current); return; }
       if (wsRef.current && Date.now() - lastMsgAt > 8000) {
         try { wsRef.current.close(); } catch {}
         open();
@@ -796,34 +1029,100 @@ export default function TradingChart() {
   const longPressTimerRef = useRef<any>(null);
   const pointerMovedRef   = useRef(false);
 
-  function _canvasPos(e: React.PointerEvent<HTMLCanvasElement>) {
+  // Endpoint / whole-shape dragging for the currently selected drawing —
+  // this is what lets a finished drawing be nudged into place afterwards
+  // instead of deleting it and redrawing from scratch.
+  interface DragState { id: string; mode: 'p1' | 'p2' | 'move'; origP1: DataPoint; origP2: DataPoint; startDP: DataPoint; }
+  const dragStateRef = useRef<DragState | null>(null);
+
+  function _canvasPos(clientX: number, clientY: number) {
     const r = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    return { x: clientX - r.left, y: clientY - r.top };
   }
 
   function _clearLongPress() {
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
   }
 
-  function onCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    try { (e.target as Element).setPointerCapture(e.pointerId); } catch {}
-    pointerMovedRef.current = false;
+  const HANDLE_HIT_R = 16; // generous touch target for dragging an endpoint
 
-    if (!drawMode) {
-      // In selection/cursor mode: detect drawing hits and handle selection/edit
-      const pos = _canvasPos(e);
-      const hit = findDrawingAt(pos.x, pos.y);
-      setSelectedId(hit?.id || null);
-      // Touch has no right-click, so a long-press on a drawing opens the
-      // same edit dialog a desktop right-click would.
-      if (hit) {
-        longPressTimerRef.current = setTimeout(() => {
-          if (!pointerMovedRef.current) setEditDraw(hit);
-        }, 500);
+  // Hit-tests the drawings at (x,y) and, if something editable is under the
+  // pointer (an endpoint handle, an h-line/v-line, or a shape's body), grabs
+  // it: arms dragStateRef / selectedId / the long-press-to-edit timer exactly
+  // as this used to do only while "Cursor" mode was switched on. Returns
+  // true if it grabbed something (the caller should keep this gesture on the
+  // drawing layer instead of letting it fall through to chart panning).
+  function _tryGrabDrawing(pos: { x: number; y: number }): boolean {
+    if (selectedId) {
+      const d = drawingsRef.current.find(x => x.id === selectedId);
+      if (d) {
+        const px1 = dataToPixel(d.p1);
+        const px2 = d.p2 ? dataToPixel(d.p2) : null;
+        const startDP = pixelToData(pos.x, pos.y);
+        if (px1 && d.tool !== 'hline' && d.tool !== 'vline' && Math.hypot(pos.x - px1.x, pos.y - px1.y) < HANDLE_HIT_R && startDP) {
+          dragStateRef.current = { id: d.id, mode: 'p1', origP1: d.p1, origP2: d.p2, startDP };
+          return true;
+        }
+        if (px2 && Math.hypot(pos.x - px2.x, pos.y - px2.y) < HANDLE_HIT_R && startDP) {
+          dragStateRef.current = { id: d.id, mode: 'p2', origP1: d.p1, origP2: d.p2, startDP };
+          return true;
+        }
+        if ((d.tool === 'hline' || d.tool === 'vline') && px1) {
+          const near = d.tool === 'hline' ? Math.abs(pos.y - px1.y) < 10 : Math.abs(pos.x - px1.x) < 10;
+          if (near && startDP) {
+            dragStateRef.current = { id: d.id, mode: 'p1', origP1: d.p1, origP2: d.p2, startDP };
+            return true;
+          }
+        }
+        if (px1 && px2 && startDP && pointToSegmentDist(pos.x, pos.y, px1.x, px1.y, px2.x, px2.y) < 8) {
+          dragStateRef.current = { id: d.id, mode: 'move', origP1: d.p1, origP2: d.p2, startDP };
+          return true;
+        }
       }
-      return;
     }
-    const pos = _canvasPos(e);
+
+    // Nothing already selected (or the touch missed its handles) — normal
+    // hit-test against every drawing. Touch has no right-click, so a
+    // long-press on a drawing opens the same edit dialog a desktop
+    // right-click would.
+    const hit = findDrawingAt(pos.x, pos.y);
+    setSelectedId(hit?.id || null);
+    if (hit) {
+      longPressTimerRef.current = setTimeout(() => {
+        if (!pointerMovedRef.current) setEditDraw(hit);
+      }, 500);
+      return true;
+    }
+    return false; // empty space — leave it alone so the chart pans/zooms normally
+  }
+
+  // Whenever a drawing-layer gesture (drag or draw) finishes, hand pointer
+  // interaction back to the chart underneath instead of leaving the overlay
+  // canvas "on top" — this is what removes the old requirement to manually
+  // flip a Cursor/selection toggle just to be able to pan again afterwards.
+  function _releaseCanvasToChart(pointerId?: number) {
+    const canvas = canvasRef.current;
+    // Hand panning/zooming back to LWC itself — this is the authoritative
+    // fix: instead of racing LWC's internal touch/pointer handling to see
+    // who reacts to the raw event first, we tell the chart directly that
+    // it's allowed to scroll/scale again. Whatever input mechanism LWC
+    // uses internally, it will respect this flag.
+    try { chartRef.current?.applyOptions({ handleScroll: true, handleScale: true }); } catch {}
+    if (!canvas) return;
+    try { if (pointerId != null) canvas.releasePointerCapture(pointerId); } catch {}
+    if (!drawMode) canvas.style.pointerEvents = 'none';
+  }
+
+  function onCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    // Only reached while drawMode is active (placing a new drawing) — once
+    // idle, the overlay is click-through and _containerPointerDown below is
+    // what grabs existing drawings instead.
+    if (!drawMode) return;
+    e.preventDefault();
+    try { (e.target as Element).setPointerCapture(e.pointerId); } catch {}
+    try { chartRef.current?.applyOptions({ handleScroll: false, handleScale: false }); } catch {}
+    pointerMovedRef.current = false;
+    const pos = _canvasPos(e.clientX, e.clientY);
     const dp  = pixelToData(pos.x, pos.y);
     if (!dp) return;
     isDrawingRef.current  = true;
@@ -839,31 +1138,143 @@ export default function TradingChart() {
   function onCanvasPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     pointerMovedRef.current = true;
     _clearLongPress();
+
+    if (dragStateRef.current) {
+      e.preventDefault();
+      const pos = _canvasPos(e.clientX, e.clientY);
+      const dp  = pixelToData(pos.x, pos.y);
+      if (!dp) return;
+      const drag = dragStateRef.current;
+      const base = drawingsRef.current.find(d => d.id === drag.id);
+      if (!base) return;
+      let next: Drawing;
+      if (drag.mode === 'p1') next = { ...base, p1: dp };
+      else if (drag.mode === 'p2') next = { ...base, p2: dp };
+      else {
+        // 'move' — shift both points by the same time/price delta
+        const deltaTime  = dp.time - drag.startDP.time;
+        const deltaPrice = dp.price - drag.startDP.price;
+        next = {
+          ...base,
+          p1: { time: drag.origP1.time + deltaTime, price: drag.origP1.price + deltaPrice },
+          p2: { time: drag.origP2.time + deltaTime, price: drag.origP2.price + deltaPrice },
+        };
+      }
+      // Write to the ref and schedule a redraw — no setDrawings here, so
+      // no React re-render on every pointermove, and no more than one
+      // canvas repaint per animation frame. Smooth dragging.
+      dragPreviewRef.current = next;
+      scheduleRedraw();
+      return;
+    }
+
     if (!isDrawingRef.current || !activeDrawRef.current) return;
-    const pos = _canvasPos(e);
+    e.preventDefault();
+    const pos = _canvasPos(e.clientX, e.clientY);
     const dp  = pixelToData(pos.x, pos.y);
     if (!dp) return;
     activeDrawRef.current.p2 = dp;
-    redrawCanvas();
+    scheduleRedraw();
   }
 
   function onCanvasPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     _clearLongPress();
-    if (!isDrawingRef.current || !activeDrawRef.current) return;
-    const pos = _canvasPos(e);
+
+    if (dragStateRef.current) {
+      const finalPos = dragPreviewRef.current;
+      dragStateRef.current = null;
+      if (finalPos) {
+        // Single commit to React state now that the gesture is done —
+        // this is the only setDrawings call in the whole drag, instead of
+        // one per pointermove.
+        setDrawings(prev => prev.map(d => d.id === finalPos.id ? finalPos : d));
+      }
+      dragPreviewRef.current = null;
+      _releaseCanvasToChart(e.pointerId);
+      redrawCanvas();
+      return;
+    }
+
+    if (!isDrawingRef.current || !activeDrawRef.current) {
+      // A plain tap/click that only selected (or deselected) a drawing —
+      // still hand control back to the chart so it can pan immediately.
+      _releaseCanvasToChart(e.pointerId);
+      return;
+    }
+    const pos = _canvasPos(e.clientX, e.clientY);
     const dp  = pixelToData(pos.x, pos.y);
     if (dp) activeDrawRef.current.p2 = dp;
     const finished = { ...activeDrawRef.current, finished: true };
     setDrawings(prev => [...prev, finished]);
     activeDrawRef.current = null;
     isDrawingRef.current  = false;
+
+    // Auto-turn-off the tool after every drawing instead of leaving it
+    // armed — no need to go back to the toolbox and switch it off by hand.
+    setDrawMode(null);
+    setSelectedId(finished.id);
+    _releaseCanvasToChart(e.pointerId);
     redrawCanvas();
   }
 
+  // Idle-state entry point: while nothing is being drawn/dragged, the
+  // overlay canvas is pointer-events:none so the chart underneath always
+  // pans/zooms freely. This listener sits on the *container* (which keeps
+  // receiving events regardless of the canvas's pointer-events value) and
+  // does a cheap hit-test the instant a touch/click lands — only if it
+  // actually lands on a drawing does it switch the canvas on and take over
+  // the gesture, so editing a drawing no longer requires a manual Cursor
+  // toggle beforehand.
+  useEffect(() => {
+    const cont = containerRef.current;
+    if (!cont) return;
+    function handleDown(e: PointerEvent) {
+      if (drawMode) return; // the canvas is already fully interactive in this case
+      if (e.target === canvasRef.current) return; // already handled directly
+      const pos = _canvasPos(e.clientX, e.clientY);
+      pointerMovedRef.current = false;
+      const grabbed = _tryGrabDrawing(pos);
+      if (!grabbed) return; // empty space — let the chart handle panning/zooming
+      // Primary fix: tell LWC directly to stop scrolling/scaling for the
+      // duration of this gesture. This works no matter which input pathway
+      // LWC uses internally (pointer events, raw touch events, mouse
+      // events) — unlike racing the raw DOM event with stopPropagation,
+      // which only helps if LWC happens to listen via pointer events too.
+      try { chartRef.current?.applyOptions({ handleScroll: false, handleScale: false }); } catch {}
+      // Also stop the raw event from reaching LWC's own canvas, in case it
+      // does listen via pointer events for something applyOptions doesn't
+      // cover (e.g. crosshair tracking) — belt and suspenders.
+      e.preventDefault();
+      e.stopPropagation();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.style.pointerEvents = 'all';
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+      }
+      redrawCanvas();
+    }
+    cont.addEventListener('pointerdown', handleDown, true); // capture phase
+
+    // Right-click also needs a container-level listener for the same
+    // reason: the overlay canvas doesn't receive it while click-through.
+    function handleContextMenu(e: MouseEvent) {
+      if (drawMode || e.target === canvasRef.current) return;
+      const pos = _canvasPos(e.clientX, e.clientY);
+      const hit = findDrawingAt(pos.x, pos.y);
+      if (hit) { e.preventDefault(); setEditDraw(hit); setSelectedId(hit.id); }
+    }
+    cont.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      cont.removeEventListener('pointerdown', handleDown, true);
+      cont.removeEventListener('contextmenu', handleContextMenu);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawMode, selectedId, redrawCanvas]);
+
   function onCanvasRightClick(e: React.MouseEvent<HTMLCanvasElement>) {
     e.preventDefault();
-    const r = canvasRef.current!.getBoundingClientRect();
-    const pos = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const pos = _canvasPos(e.clientX, e.clientY);
     const hit = findDrawingAt(pos.x, pos.y);
     if (hit) { setEditDraw(hit); setSelectedId(hit.id); }
   }
@@ -926,15 +1337,17 @@ export default function TradingChart() {
           ref={containerRef}
           style={{ width:'100%', height: hasSubChart ? 'calc(100% - 130px)' : '100%', position:'relative' }}
         >
-          {/* Canvas: captures events when drawing OR in cursor/selection mode.
-               When neither drawMode nor selectionMode is active the canvas is
-               transparent so the chart receives scroll/zoom events normally. */}
+          {/* Canvas: fully interactive while placing a new drawing (drawMode).
+               Otherwise it's click-through (pointerEvents:none) so the chart
+               always pans/zooms freely — the container-level listener below
+               switches it back on for the duration of a gesture the instant
+               a touch/click actually lands on an existing drawing. */}
           <canvas
             ref={canvasRef}
             style={{
               position:'absolute', inset:0, zIndex:10,
-              pointerEvents: (drawMode || selectionMode) ? 'all' : 'none',
-              cursor: drawMode ? 'crosshair' : selectionMode ? 'pointer' : 'default',
+              pointerEvents: drawMode ? 'all' : 'none',
+              cursor: drawMode ? 'crosshair' : 'default',
               touchAction: 'none',
             }}
             onPointerDown={onCanvasPointerDown}
@@ -1052,26 +1465,23 @@ export default function TradingChart() {
             {/* Tool groups */}
             <div style={{ maxHeight:260, overflowY:'auto' }}>
               {TOOL_GROUPS.map(group => (
-                <div key={group.label}>
+                <div key={group.labelKey}>
                   <div style={{ padding:'6px 12px 3px', fontSize:9, fontWeight:800, color:'var(--t4)', letterSpacing:'.8px', textTransform:'uppercase' }}>
-                    {group.label}
+                    {t(group.labelKey)}
                   </div>
-                  {group.tools.map(({ id, label, icon }) => {
-                    // Cursor tool (id===null) toggles selectionMode rather than drawMode
-                    const isActive = id === null ? selectionMode : drawMode === id;
+                  {group.tools.map(({ id, labelKey, icon }) => {
+                    // Cursor (id===null) just exits drawing mode — editing an
+                    // existing drawing (dragging a handle, long-press to open
+                    // its settings) works automatically as soon as you touch
+                    // it, no mode switch required.
+                    const isActive = id === null ? drawMode === null : drawMode === id;
                     const color = id ? TOOL_COLORS[id] : 'var(--g0)';
                     return (
                       <button
-                        key={label}
+                        key={labelKey}
                         onClick={() => {
-                          if (id === null) {
-                            // Toggle cursor / selection mode
-                            setSelectionMode(m => !m);
-                            setDrawMode(null);
-                          } else {
-                            setDrawMode(d => d === id ? null : id);
-                            setSelectionMode(false);
-                          }
+                          if (id === null) setDrawMode(null);
+                          else setDrawMode(d => d === id ? null : id);
                         }}
                         style={{
                           display:'flex', alignItems:'center', gap:8, padding:'7px 12px', width:'100%',
@@ -1083,7 +1493,7 @@ export default function TradingChart() {
                         }}
                       >
                         <span style={{ fontFamily:'monospace', fontSize:14, width:16, textAlign:'center', color: isActive ? color : 'var(--t4)' }}>{icon}</span>
-                        {label}
+                        {t(labelKey)}
                         {isActive && <span style={{ marginLeft:'auto', fontSize:9, background:color+'30', color, padding:'2px 5px', borderRadius:4 }}>ON</span>}
                       </button>
                     );
@@ -1118,7 +1528,7 @@ export default function TradingChart() {
             padding:16, zIndex:40, minWidth:220, boxShadow:'0 12px 48px rgba(0,0,0,.6)',
           }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)' }}>Edit {allToolsFlat.find(x => x.id === editDraw.tool)?.label || editDraw.tool}</div>
+              <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)' }}>Edit {(() => { const found = allToolsFlat.find(x => x.id === editDraw.tool); return found ? t(found.labelKey) : editDraw.tool; })()}</div>
               <button onClick={() => setEditDraw(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--t4)', fontSize:16 }}>×</button>
             </div>
 

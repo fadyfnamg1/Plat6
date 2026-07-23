@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../lib/store';
+import { useI18n } from '../../lib/i18n';
 
 type SignalDir = 'buy' | 'sell';
 
@@ -26,18 +27,12 @@ interface Signal {
   generatedAt: number;
 }
 
-const REASONS = [
-  'RSI oversold + support bounce',
-  'MACD bullish crossover detected',
-  'Bollinger band squeeze breakout',
-  'EMA 20/50 golden cross',
-  'Strong volume spike + trend',
-  'Support/resistance flip',
-  'Stochastic divergence signal',
-  'VWAP reclaim with momentum',
+const REASON_KEYS = [
+  'sig.reason1', 'sig.reason2', 'sig.reason3', 'sig.reason4',
+  'sig.reason5', 'sig.reason6', 'sig.reason7', 'sig.reason8',
 ];
 
-function genSignals(markets: any[]): Signal[] {
+function genSignals(markets: any[], t: (k: string) => string): Signal[] {
   const top = markets.slice(0, 12);
   return top.map((m, i) => {
     const dir: SignalDir = Math.random() > 0.5 ? 'buy' : 'sell';
@@ -53,7 +48,7 @@ function genSignals(markets: any[]): Signal[] {
       accuracy: 65 + Math.floor(Math.random() * 25),
       win: Math.floor(Math.random() * 120) + 40,
       total: Math.floor(Math.random() * 60) + 90,
-      reason: REASONS[Math.floor(Math.random() * REASONS.length)],
+      reason: t(REASON_KEYS[Math.floor(Math.random() * REASON_KEYS.length)]),
       generatedAt: Date.now(),
     };
   });
@@ -62,6 +57,7 @@ function genSignals(markets: any[]): Signal[] {
 const REFRESH_SEC = 30;
 
 export default function SignalsOverlay() {
+  const { t } = useI18n();
   const setOverlay       = useStore(s => s.setOverlay);
   const markets          = useStore(s => s.markets);
   const setCurrentMarket = useStore(s => s.setCurrentMarket);
@@ -73,10 +69,11 @@ export default function SignalsOverlay() {
   const [refreshIn, setRefreshIn] = useState(REFRESH_SEC);
 
   useEffect(() => {
-    setSignals(genSignals(markets));
-    const genIv = setInterval(() => { setSignals(genSignals(markets)); setRefreshIn(REFRESH_SEC); }, REFRESH_SEC * 1000);
+    setSignals(genSignals(markets, t));
+    const genIv = setInterval(() => { setSignals(genSignals(markets, t)); setRefreshIn(REFRESH_SEC); }, REFRESH_SEC * 1000);
     const tickIv = setInterval(() => setRefreshIn(s => Math.max(0, s - 1)), 1000);
     return () => { clearInterval(genIv); clearInterval(tickIv); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markets]);
 
   const filtered = signals.filter(s => filter === 'all' || s.dir === filter);
@@ -89,14 +86,14 @@ export default function SignalsOverlay() {
     setCurrentMarket(market);
     setExpiry(sig.expiryMin, sig.expiryLabel);
     setOverlay('none');
-    showToast(`${sig.dir === 'buy' ? '▲ Tap UP' : '▼ Tap DOWN'} on ${sig.base} · ${sig.expiryLabel} expiry ready`);
+    showToast(`${sig.dir === 'buy' ? '▲ ' + t('sig.tapUp') : '▼ ' + t('sig.tapDown')} on ${sig.base} · ${sig.expiryLabel} ${t('sig.expiryReady')}`);
   }
 
   function timeAgo(ts: number) {
-    const s = Math.floor((Date.now() - ts) / 1000);
-    if (s < 5) return 'just now';
-    if (s < 60) return `${s}s ago`;
-    return `${Math.floor(s / 60)}m ago`;
+    const secs = Math.floor((Date.now() - ts) / 1000);
+    if (secs < 5) return t('sig.justNow');
+    if (secs < 60) return `${secs}s ${t('sig.ago')}`;
+    return `${Math.floor(secs / 60)}m ${t('sig.ago')}`;
   }
 
   return (
@@ -104,10 +101,10 @@ export default function SignalsOverlay() {
       <div className="overlay-sheet" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
         <div className="overlay-handle" />
         <div className="overlay-header">
-          <span className="overlay-title">Trade Signals</span>
+          <span className="overlay-title">{t('sig.title')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--g0)', display: 'inline-block', boxShadow: '0 0 6px var(--g0)', animation: 'pulseDot 2s infinite' }} />
-            <span style={{ fontSize: 11, color: 'var(--g0)', fontWeight: 700 }}>LIVE</span>
+            <span style={{ fontSize: 11, color: 'var(--g0)', fontWeight: 700 }}>{t('sig.live')}</span>
           </div>
           <button className="overlay-close" onClick={() => setOverlay('none')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -117,16 +114,16 @@ export default function SignalsOverlay() {
         <div style={{ padding: '8px 16px 0' }}>
           <div style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
-            1–5 minute signals · refreshing in {refreshIn}s
+            {t('sig.durationNote')} · {t('sig.refreshingIn')} {refreshIn}s
           </div>
           <div className="signal-filter-row">
             {(['all','buy','sell'] as const).map(f => (
               <div key={f} className={`signal-filter ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? t('wd.all') : f === 'buy' ? t('sig.buy') : t('sig.sell')}
               </div>
             ))}
             <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--t4)', alignSelf: 'center' }}>
-              {filtered.length} signals
+              {filtered.length} {t('sig.signalsCount')}
             </div>
           </div>
         </div>
@@ -144,7 +141,7 @@ export default function SignalsOverlay() {
                   {sig.dir === 'buy' ? '▲ ' : '▼ '}{sig.dir.toUpperCase()}
                 </span>
                 <span className="signal-market">{sig.base}</span>
-                <span className="signal-tf" title="Recommended trade duration">{sig.expiryLabel} expiry</span>
+                <span className="signal-tf" title={t('sig.recommendedDuration')}>{sig.expiryLabel} {t('sig.expirySuffix')}</span>
                 <span style={{ fontSize: 10, color: 'var(--t4)', marginLeft: 'auto' }}>{timeAgo(sig.generatedAt)}</span>
               </div>
 
@@ -153,8 +150,8 @@ export default function SignalsOverlay() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>Strength {sig.strength}%</span>
-                <span style={{ fontSize: 10, color: 'var(--t4)' }}>Accuracy {sig.accuracy}%</span>
+                <span style={{ fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>{t('sig.strength')} {sig.strength}%</span>
+                <span style={{ fontSize: 10, color: 'var(--t4)' }}>{t('sig.accuracy')} {sig.accuracy}%</span>
               </div>
               <div className="signal-strength-bar">
                 <div className={`signal-strength-fill ${sig.dir}`} style={{ width: `${sig.strength}%` }} />
@@ -162,15 +159,15 @@ export default function SignalsOverlay() {
 
               <div className="signal-metrics">
                 <div className="signal-metric">
-                  <div className="signal-metric-label">Win Rate</div>
+                  <div className="signal-metric-label">{t('app.panel.winRate')}</div>
                   <div className="signal-metric-val" style={{ color: 'var(--g0)' }}>{Math.round((sig.win / sig.total) * 100)}%</div>
                 </div>
                 <div className="signal-metric">
-                  <div className="signal-metric-label">Win/Total</div>
+                  <div className="signal-metric-label">{t('sig.winTotal')}</div>
                   <div className="signal-metric-val">{sig.win}/{sig.total}</div>
                 </div>
                 <div className="signal-metric">
-                  <div className="signal-metric-label">Expiry</div>
+                  <div className="signal-metric-label">{t('app.trade.expiry')}</div>
                   <div className="signal-metric-val">{sig.expiryLabel}</div>
                 </div>
               </div>
@@ -180,7 +177,7 @@ export default function SignalsOverlay() {
                 style={{ width: '100%', marginTop: 10 }}
                 onClick={e => { e.stopPropagation(); enterSignal(sig); }}
               >
-                Enter Trade — {sig.dir === 'buy' ? 'BUY' : 'SELL'} {sig.base} · {sig.expiryLabel}
+                {t('sig.enterTrade')} — {sig.dir === 'buy' ? t('app.trade.buyUp') : t('app.trade.sellDown')} {sig.base} · {sig.expiryLabel}
               </button>
             </div>
           ))}

@@ -1,9 +1,10 @@
 import { useStore } from '../lib/store';
 import { playClick, resumeAudio } from '../lib/sounds';
+import { useI18n } from '../lib/i18n';
 
 const NAV = [
   {
-    id: 'chart', label: 'Chart',
+    id: 'chart', labelKey: 'app.nav.chart',
     icon: () => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="4" width="4" height="16" rx="1"/>
@@ -13,7 +14,7 @@ const NAV = [
     ),
   },
   {
-    id: 'history', label: 'History',
+    id: 'history', labelKey: 'app.nav.history',
     icon: () => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -21,7 +22,7 @@ const NAV = [
     ),
   },
   {
-    id: 'signals', label: 'Signals',
+    id: 'signals', labelKey: 'app.nav.signals',
     icon: () => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/>
@@ -29,7 +30,7 @@ const NAV = [
     ),
   },
   {
-    id: 'indicators', label: 'Indicators',
+    id: 'indicators', labelKey: 'app.nav.indicators',
     icon: () => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
@@ -40,7 +41,7 @@ const NAV = [
     ),
   },
   {
-    id: 'panel', label: 'Account',
+    id: 'panel', labelKey: 'app.nav.account',
     icon: () => (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
@@ -55,6 +56,7 @@ export default function NavBar() {
   const setOverlay = useStore(s => s.setOverlay);
   const trades    = useStore(s => s.trades);
   const openTrades = trades.filter(t => !t.resolved);
+  const { t } = useI18n();
 
   function navPress(id: string) {
     resumeAudio(); playClick();
@@ -69,7 +71,7 @@ export default function NavBar() {
         return (
           <div key={n.id} className={`nav-item ${active ? 'active' : ''}`} onClick={() => navPress(n.id)}>
             <span className="nav-icon">{n.icon()}</span>
-            <span className="nav-label">{n.label}</span>
+            <span className="nav-label">{t(n.labelKey)}</span>
             {n.id === 'history' && openTrades.length > 0 && (
               <span className="nav-badge">{openTrades.length}</span>
             )}

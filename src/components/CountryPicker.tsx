@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { COUNTRIES, flagEmoji } from '../lib/countries';
+import { useI18n } from '../lib/i18n';
 
 export default function CountryPicker({
   onSelect,
@@ -8,6 +9,7 @@ export default function CountryPicker({
   onSelect: (country: string) => void;
   current?: string | null;
 }) {
+  const { t } = useI18n();
   const [q, setQ] = useState('');
 
   const filtered = useMemo(() => {
@@ -19,9 +21,9 @@ export default function CountryPicker({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--t1)', marginBottom: 4 }}>Select your country</div>
+        <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--t1)', marginBottom: 4 }}>{t('cp.selectCountry')}</div>
         <div style={{ fontSize: 12.5, color: 'var(--t4)', lineHeight: 1.6 }}>
-          This determines which payment methods are available to you.
+          {t('cp.determinesNote')}
         </div>
       </div>
 
@@ -33,7 +35,7 @@ export default function CountryPicker({
         <input
           className="auth-input"
           style={{ paddingLeft: 36 }}
-          placeholder="Search countries..."
+          placeholder={t('cp.searchPlaceholder')}
           value={q}
           onChange={e => setQ(e.target.value)}
         />
@@ -41,7 +43,7 @@ export default function CountryPicker({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '52vh', overflowY: 'auto' }}>
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--t4)', fontSize: 13 }}>No countries match "{q}"</div>
+          <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--t4)', fontSize: 13 }}>{t('cp.noMatch')} "{q}"</div>
         )}
         {filtered.map(c => {
           const active = current === c.name;
